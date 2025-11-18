@@ -524,7 +524,7 @@ import Footer from "../../components/Footer.astro";
                     uso_tutorias: document.getElementById('tutorias').checked ? 1 : 0
                 };
 
-                const response = await fetch(${API_URL}predict, {
+                const response = await fetch(${API_URL}/predict, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
@@ -797,7 +797,7 @@ import Footer from "../../components/Footer.astro";
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
             try {
-                const response = await fetch(${API_URL}chat, {
+                const response = await fetch(${API_URL}/chat, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
