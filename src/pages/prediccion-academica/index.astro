@@ -149,17 +149,22 @@ import Footer from "../../components/Footer.astro";
             padding: 12px 16px;
             border-radius: 15px;
             max-width: 80%;
+            word-wrap: break-word;
+            display: block;
         }
 
         .chat-message.bot {
             background: #f0f0f0;
             margin-right: auto;
+            margin-left: 0;
         }
 
         .chat-message.user {
             background: linear-gradient(135deg, #004B93 0%, #003A75 100%);
             color: white;
             margin-left: auto;
+            margin-right: 0;
+            text-align: right;
         }
 
         .chatbot-input {
@@ -673,34 +678,31 @@ import Footer from "../../components/Footer.astro";
             else if (nivel === 'MEDIO') color = '#f59e0b';
             else color = '#10b981';
             
-            // Plugin para mostrar texto en el centro
+            // Plugin para mostrar texto centrado sin números superpuestos
             const centerTextPlugin = {
                 id: 'centerText',
-                afterDraw: (chart) => {
+                afterDatasetsDraw: (chart) => {
                     const ctx = chart.ctx;
                     const width = chart.width;
                     const height = chart.height;
-                    
-                    ctx.restore();
-                    const fontSize = (height / 114).toFixed(2);
-                    ctx.font = `bold ${fontSize}em sans-serif`;
-                    ctx.textBaseline = 'middle';
-                    ctx.fillStyle = color;
-                    
-                    const text = porcentaje + '%';
-                    const textX = Math.round((width - ctx.measureText(text).width) / 2);
-                    const textY = height / 1.5;
-                    
-                    ctx.fillText(text, textX, textY);
-                    
-                    // Texto "Riesgo"
-                    ctx.font = `${fontSize * 0.5}em sans-serif`;
-                    ctx.fillStyle = '#6b7280';
-                    const subtext = 'Riesgo de Reprobación';
-                    const subtextX = Math.round((width - ctx.measureText(subtext).width) / 2);
-                    ctx.fillText(subtext, subtextX, textY + 25);
+                    const centerX = width / 2;
+                    const centerY = height / 1.4;
                     
                     ctx.save();
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    // Porcentaje grande
+                    ctx.font = `bold ${Math.min(width, height) / 5}px sans-serif`;
+                    ctx.fillStyle = color;
+                    ctx.fillText(`${porcentaje}%`, centerX, centerY);
+                    
+                    // Texto descriptivo
+                    ctx.font = `${Math.min(width, height) / 25}px sans-serif`;
+                    ctx.fillStyle = '#6b7280';
+                    ctx.fillText('Riesgo', centerX, centerY + 35);
+                    
+                    ctx.restore();
                 }
             };
             
@@ -710,13 +712,15 @@ import Footer from "../../components/Footer.astro";
                     datasets: [{
                         data: [porcentaje, 100 - porcentaje],
                         backgroundColor: [color, '#e5e7eb'],
-                        borderWidth: 0
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
                     }]
                 },
                 options: {
-                    circumference: 180,
-                    rotation: -90,
-                    cutout: '70%',
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2,
                     plugins: {
                         legend: { display: false },
                         tooltip: { enabled: false }
