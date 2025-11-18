@@ -45,7 +45,7 @@ import Footer from "../../components/Footer.astro";
 
         .slider-value {
             display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #004B93 0%, #003A75 100%);
             color: white;
             padding: 5px 15px;
             border-radius: 20px;
@@ -55,28 +55,28 @@ import Footer from "../../components/Footer.astro";
         }
 
         .form-range::-webkit-slider-thumb {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #004B93 0%, #003A75 100%);
         }
 
         .form-range::-moz-range-thumb {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #004B93 0%, #003A75 100%);
         }
 
         .btn-analyze {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #FFC72C 0%, #E6B800 100%);
             border: none;
             padding: 15px 40px;
             font-size: 1.1rem;
             font-weight: 600;
             border-radius: 50px;
-            color: white;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            color: #003A75;
+            box-shadow: 0 4px 15px rgba(255, 199, 44, 0.4);
             transition: all 0.3s ease;
         }
 
         .btn-analyze:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+            box-shadow: 0 6px 20px rgba(255, 199, 44, 0.6);
         }
 
         .risk-badge {
@@ -129,7 +129,7 @@ import Footer from "../../components/Footer.astro";
         }
 
         .chatbot-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #004B93 0%, #003A75 100%);
             color: white;
             padding: 20px;
             display: flex;
@@ -157,7 +157,7 @@ import Footer from "../../components/Footer.astro";
         }
 
         .chat-message.user {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #004B93 0%, #003A75 100%);
             color: white;
             margin-left: auto;
         }
@@ -175,11 +175,11 @@ import Footer from "../../components/Footer.astro";
             width: 60px;
             height: 60px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: linear-gradient(135deg, #FFC72C 0%, #E6B800 100%);
+            color: #003A75;
             border: none;
             font-size: 1.5rem;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 15px rgba(255, 199, 44, 0.4);
             cursor: pointer;
             z-index: 999;
             display: flex;
@@ -190,7 +190,7 @@ import Footer from "../../components/Footer.astro";
 
         .chat-toggle-btn:hover {
             transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+            box-shadow: 0 6px 20px rgba(255, 199, 44, 0.6);
         }
 
         .spinner-border-custom {
@@ -329,8 +329,16 @@ import Footer from "../../components/Footer.astro";
                     <!-- Riesgo Principal -->
                     <div class="result-card text-center">
                         <h4 class="fw-bold mb-4"><i class="bi bi-exclamation-triangle"></i> Nivel de Riesgo</h4>
-                        <div style="font-size: 4rem; font-weight: 700; color: #667eea;" id="risk-percentage">0%</div>
+                        <div style="font-size: 4rem; font-weight: 700; color: #004B93;" id="risk-percentage">0%</div>
                         <div id="risk-badge" class="mt-3"></div>
+                        
+                        <!-- Probabilidad de Aprobar -->
+                        <div class="mt-4 p-3 bg-light rounded">
+                            <h5 class="fw-bold text-success mb-2">
+                                <i class="bi bi-trophy-fill"></i> Probabilidad de Aprobar
+                            </h5>
+                            <div style="font-size: 2.5rem; font-weight: 700; color: #10b981;" id="prob-aprobar">0%</div>
+                        </div>
                     </div>
 
                     <!-- Velocímetro -->
@@ -385,26 +393,65 @@ import Footer from "../../components/Footer.astro";
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <!-- Introducción -->
+                    <div class="alert alert-info mb-4">
+                        <h6 class="fw-bold mb-2"><i class="bi bi-info-circle"></i> ¿Cómo funciona el modelo?</h6>
+                        <p class="mb-0 small">
+                            Este sistema utiliza <strong>Regresión Logística</strong>, un algoritmo de Machine Learning 
+                            que calcula la probabilidad de que un estudiante repruebe basándose en sus datos académicos. 
+                            El modelo fue entrenado con datos históricos de estudiantes para identificar patrones de riesgo.
+                        </p>
+                    </div>
+
                     <!-- Fórmulas -->
                     <div class="card mb-3">
                         <div class="card-header bg-light">
                             <h6 class="mb-0"><i class="bi bi-calculator"></i> Fórmulas del Modelo</h6>
                         </div>
                         <div class="card-body">
-                            <p class="small text-muted mb-2">1. Cálculo del Logit (z):</p>
+                            <p class="small text-muted mb-2"><strong>1. Cálculo del Logit (z):</strong></p>
+                            <p class="small mb-2">
+                                Esta fórmula combina todas tus variables académicas (asistencia, notas, etc.) 
+                                con coeficientes que indican su importancia. Cada variable se multiplica por su 
+                                peso y se suman para obtener un valor llamado "logit".
+                            </p>
                             <div id="formula-logit" class="p-3 bg-light rounded text-center mb-3"></div>
                             
-                            <p class="small text-muted mb-2">2. Función Sigmoide (Probabilidad):</p>
+                            <p class="small text-muted mb-2 mt-4"><strong>2. Función Sigmoide (Probabilidad):</strong></p>
+                            <p class="small mb-2">
+                                La función sigmoide convierte el logit (que puede ser cualquier número) 
+                                en una probabilidad entre 0% y 100%. Esta es la probabilidad final de riesgo.
+                            </p>
                             <div id="formula-sigmoide" class="p-3 bg-light rounded text-center"></div>
+                        </div>
+                    </div>
+
+                    <!-- Explicación de Variables -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0"><i class="bi bi-book"></i> ¿Qué significa cada variable?</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="small mb-0">
+                                <li><strong>Asistencia:</strong> Tu porcentaje de asistencia a clases. Mayor asistencia = menor riesgo.</li>
+                                <li><strong>Seguimiento:</strong> Tu nivel de participación en actividades, tareas y seguimiento del curso (escala 0-5).</li>
+                                <li><strong>Parcial 1:</strong> Tu calificación en el primer examen parcial (escala 0-5).</li>
+                                <li><strong>Logins:</strong> Número de veces que has ingresado a la plataforma educativa. Refleja tu compromiso.</li>
+                                <li><strong>Tutorías:</strong> Si aprovechas (1) o no (0) las tutorías disponibles para apoyo académico.</li>
+                            </ul>
                         </div>
                     </div>
 
                     <!-- Tabla -->
                     <div class="card mb-3">
                         <div class="card-header bg-light">
-                            <h6 class="mb-0"><i class="bi bi-table"></i> Tabla de Cálculo</h6>
+                            <h6 class="mb-0"><i class="bi bi-table"></i> Cálculo Paso a Paso</h6>
                         </div>
                         <div class="card-body">
+                            <p class="small text-muted mb-3">
+                                Aquí puedes ver cómo cada una de tus variables contribuye al cálculo final. 
+                                Los valores están <strong>escalados</strong> (normalizados) para que el modelo funcione correctamente.
+                            </p>
                             <div class="table-responsive">
                                 <table class="table table-sm table-hover">
                                     <thead class="table-light">
@@ -418,6 +465,9 @@ import Footer from "../../components/Footer.astro";
                                     <tbody id="math-table-body"></tbody>
                                 </table>
                             </div>
+                            <p class="small text-muted mb-0">
+                                <strong>Nota:</strong> Los coeficientes positivos aumentan el riesgo, los negativos lo disminuyen.
+                            </p>
                         </div>
                     </div>
 
@@ -427,12 +477,16 @@ import Footer from "../../components/Footer.astro";
                             <h6 class="mb-0"><i class="bi bi-123"></i> Cálculos Finales</h6>
                         </div>
                         <div class="card-body">
+                            <p class="small text-muted mb-3">
+                                El <strong>intercepto</strong> es el valor base del modelo. Los impactos de todas las variables 
+                                se suman al intercepto para calcular el logit (z), que luego se convierte en probabilidad.
+                            </p>
                             <div class="mb-3">
                                 <small class="text-muted">Intercepto (β₀):</small>
                                 <div class="bg-light p-2 rounded font-monospace" id="intercepto-value">0.0000</div>
                             </div>
                             <div class="mb-3">
-                                <small class="text-muted">Cálculo de z:</small>
+                                <small class="text-muted">Cálculo de z (logit):</small>
                                 <div class="bg-light p-2 rounded font-monospace small" id="calculo-logit">z = ...</div>
                             </div>
                             <div>
@@ -550,6 +604,10 @@ import Footer from "../../components/Footer.astro";
 
             const porcentaje = Math.round(data.porcentaje_riesgo);
             document.getElementById('risk-percentage').textContent = porcentaje + '%';
+            
+            // Calcular probabilidad de aprobar (inverso del riesgo)
+            const probAprobar = 100 - porcentaje;
+            document.getElementById('prob-aprobar').textContent = probAprobar + '%';
 
             let badgeClass, badgeText;
             if (data.nivel_riesgo === 'ALTO') {
@@ -577,27 +635,29 @@ import Footer from "../../components/Footer.astro";
             let html = texto;
             html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>');
             
-            html = html.split('\\n').map(linea => {
+            // Reemplazar saltos de línea reales y literales
+            html = html.replace(/\\n/g, '\n');
+            html = html.split('\n').map(linea => {
                 linea = linea.trim();
-                if (!linea) return '<div class="mb-2"></div>';
+                if (!linea) return '<div class="mb-3"></div>';
                 
                 if (linea.match(/^(⚠️|✅|🌟|💡|⚡|💪|🎉)/)) {
                     return `<h6 class="fw-bold mt-3 mb-2">${linea}</h6>`;
                 }
                 
                 if (linea.startsWith('•')) {
-                    return `<div class="ms-3 mb-1">• ${linea.substring(1).trim()}</div>`;
+                    return `<div class="ms-3 mb-2">• ${linea.substring(1).trim()}</div>`;
                 }
                 
                 if (linea.startsWith('   •')) {
-                    return `<div class="ms-5 mb-1 small">→ ${linea.substring(4).trim()}</div>`;
+                    return `<div class="ms-5 mb-2 small">→ ${linea.substring(4).trim()}</div>`;
                 }
                 
                 if (linea === '---') {
                     return '<hr class="my-3">';
                 }
                 
-                return `<p class="mb-2">${linea}</p>`;
+                return `<p class="mb-3">${linea}</p>`;
             }).join('');
             
             return html;
@@ -612,6 +672,37 @@ import Footer from "../../components/Footer.astro";
             if (nivel === 'ALTO') color = '#ef4444';
             else if (nivel === 'MEDIO') color = '#f59e0b';
             else color = '#10b981';
+            
+            // Plugin para mostrar texto en el centro
+            const centerTextPlugin = {
+                id: 'centerText',
+                afterDraw: (chart) => {
+                    const ctx = chart.ctx;
+                    const width = chart.width;
+                    const height = chart.height;
+                    
+                    ctx.restore();
+                    const fontSize = (height / 114).toFixed(2);
+                    ctx.font = `bold ${fontSize}em sans-serif`;
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = color;
+                    
+                    const text = porcentaje + '%';
+                    const textX = Math.round((width - ctx.measureText(text).width) / 2);
+                    const textY = height / 1.5;
+                    
+                    ctx.fillText(text, textX, textY);
+                    
+                    // Texto "Riesgo"
+                    ctx.font = `${fontSize * 0.5}em sans-serif`;
+                    ctx.fillStyle = '#6b7280';
+                    const subtext = 'Riesgo de Reprobación';
+                    const subtextX = Math.round((width - ctx.measureText(subtext).width) / 2);
+                    ctx.fillText(subtext, subtextX, textY + 25);
+                    
+                    ctx.save();
+                }
+            };
             
             gaugeChart = new Chart(ctx, {
                 type: 'doughnut',
@@ -630,7 +721,8 @@ import Footer from "../../components/Footer.astro";
                         legend: { display: false },
                         tooltip: { enabled: false }
                     }
-                }
+                },
+                plugins: [centerTextPlugin]
             });
         }
 
