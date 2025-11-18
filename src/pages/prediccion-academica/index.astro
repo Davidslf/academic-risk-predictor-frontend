@@ -142,29 +142,32 @@ import Footer from "../../components/Footer.astro";
             padding: 20px;
             overflow-y: auto;
             max-height: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         .chat-message {
-            margin-bottom: 15px;
             padding: 12px 16px;
             border-radius: 15px;
             max-width: 80%;
             word-wrap: break-word;
-            display: block;
+            clear: both;
+            position: relative;
         }
 
         .chat-message.bot {
             background: #f0f0f0;
-            margin-right: auto;
-            margin-left: 0;
+            color: #000;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
         }
 
         .chat-message.user {
             background: linear-gradient(135deg, #004B93 0%, #003A75 100%);
             color: white;
-            margin-left: auto;
-            margin-right: 0;
-            text-align: right;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
         }
 
         .chatbot-input {
@@ -678,55 +681,55 @@ import Footer from "../../components/Footer.astro";
             else if (nivel === 'MEDIO') color = '#f59e0b';
             else color = '#10b981';
             
-            // Plugin para mostrar texto centrado sin números superpuestos
-            const centerTextPlugin = {
-                id: 'centerText',
-                afterDatasetsDraw: (chart) => {
-                    const ctx = chart.ctx;
-                    const width = chart.width;
-                    const height = chart.height;
-                    const centerX = width / 2;
-                    const centerY = height / 1.4;
-                    
-                    ctx.save();
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    
-                    // Porcentaje grande
-                    ctx.font = `bold ${Math.min(width, height) / 5}px sans-serif`;
-                    ctx.fillStyle = color;
-                    ctx.fillText(`${porcentaje}%`, centerX, centerY);
-                    
-                    // Texto descriptivo
-                    ctx.font = `${Math.min(width, height) / 25}px sans-serif`;
-                    ctx.fillStyle = '#6b7280';
-                    ctx.fillText('Riesgo', centerX, centerY + 35);
-                    
-                    ctx.restore();
-                }
-            };
-            
             gaugeChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     datasets: [{
                         data: [porcentaje, 100 - porcentaje],
                         backgroundColor: [color, '#e5e7eb'],
-                        borderWidth: 0,
-                        circumference: 180,
-                        rotation: 270
+                        borderWidth: 0
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: true,
                     aspectRatio: 2,
+                    circumference: 180,
+                    rotation: 270,
+                    cutout: '75%',
                     plugins: {
                         legend: { display: false },
                         tooltip: { enabled: false }
+                    },
+                    animation: {
+                        animateRotate: true,
+                        animateScale: false
                     }
                 },
-                plugins: [centerTextPlugin]
+                plugins: [{
+                    id: 'textCenter',
+                    beforeDraw: (chart) => {
+                        const { width, height, ctx } = chart;
+                        ctx.restore();
+                        
+                        const centerX = width / 2;
+                        const centerY = height * 0.75;
+                        
+                        // Porcentaje
+                        ctx.font = `bold ${height / 4}px Arial`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = color;
+                        ctx.fillText(`${porcentaje}%`, centerX, centerY);
+                        
+                        // Texto
+                        ctx.font = `${height / 15}px Arial`;
+                        ctx.fillStyle = '#6b7280';
+                        ctx.fillText('de Riesgo', centerX, centerY + height / 8);
+                        
+                        ctx.save();
+                    }
+                }]
             });
         }
 
