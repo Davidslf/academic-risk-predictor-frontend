@@ -7,109 +7,89 @@ import Footer from "../../components/Footer.astro";
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <BaseHead 
+    <BaseHead
         title="Predictor de Riesgo Académico | Realizar Predicción"
-        description="Ingresa tus datos académicos y obtén una predicción instantánea de tu riesgo de reprobación con consejos personalizados."
+        description="Ingresa tus datos académicos y obtén una predicción instantánea con análisis completo."
     />
+   
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'navy': '#001f3f',
+                        'dark-blue': '#003366',
+                        'gold': '#FFB81C',
+                        'gold-light': '#FFC845',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    
+
+    <!-- KaTeX para fórmulas -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+
     <style>
         body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: linear-gradient(135deg, #001f3f 0%, #003366 100%);
+            color: #e2e8f0;
             min-height: 100vh;
+            font-family: system-ui, -apple-system, sans-serif;
         }
 
-        .input-card {
-            background: white;
+        .card {
+            background: linear-gradient(135deg, #003366 0%, #004080 100%);
+            border: 2px solid #FFB81C;
             border-radius: 1rem;
-            padding: 2rem;
-            box-shadow: 0 10px 25px rgba(0, 51, 102, 0.1);
+            padding: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(255, 184, 28, 0.2);
             transition: all 0.3s ease;
         }
 
-        .input-card:hover {
-            box-shadow: 0 15px 35px rgba(0, 51, 102, 0.15);
+        .card:hover {
+            box-shadow: 0 20px 25px -5px rgba(255, 184, 28, 0.3);
+            transform: translateY(-2px);
+            border-color: #FFC845;
         }
 
-        .slider-container {
-            margin-bottom: 1.5rem;
-        }
-
-        .slider-label {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: #1e293b;
-        }
-
-        .slider-value {
-            background: linear-gradient(135deg, #003366 0%, #0066cc 100%);
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 0.5rem;
-            font-size: 0.9rem;
-            min-width: 60px;
-            text-align: center;
-        }
-
+        /* Sliders */
         input[type="range"] {
             -webkit-appearance: none;
-            appearance: none;
             width: 100%;
-            height: 10px;
+            height: 8px;
             border-radius: 5px;
-            background: #e2e8f0;
+            background: #475569;
             outline: none;
-            transition: all 0.3s ease;
-        }
-
-        input[type="range"]:hover {
-            background: #cbd5e1;
         }
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            appearance: none;
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #003366 0%, #0066cc 100%);
+            background: #FFB81C;
             cursor: pointer;
             transition: all 0.3s ease;
-            border: 3px solid white;
-            box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
         }
 
         input[type="range"]::-webkit-slider-thumb:hover {
+            background: #FFC845;
             transform: scale(1.2);
-            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.4);
         }
 
-        input[type="range"]::-moz-range-thumb {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #003366 0%, #0066cc 100%);
-            cursor: pointer;
-            border: 3px solid white;
-            box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
-        }
-
-        .toggle-container {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
+        /* Toggle switch */
         .toggle-switch {
             position: relative;
             display: inline-block;
-            width: 56px;
-            height: 30px;
+            width: 60px;
+            height: 34px;
         }
 
         .toggle-switch input {
@@ -118,23 +98,23 @@ import Footer from "../../components/Footer.astro";
             height: 0;
         }
 
-        .toggle-slider {
+        .slider-toggle {
             position: absolute;
             cursor: pointer;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: #cbd5e1;
+            background-color: #475569;
             transition: 0.4s;
-            border-radius: 30px;
+            border-radius: 34px;
         }
 
-        .toggle-slider:before {
+        .slider-toggle:before {
             position: absolute;
             content: "";
-            height: 22px;
-            width: 22px;
+            height: 26px;
+            width: 26px;
             left: 4px;
             bottom: 4px;
             background-color: white;
@@ -142,54 +122,22 @@ import Footer from "../../components/Footer.astro";
             border-radius: 50%;
         }
 
-        input:checked + .toggle-slider {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        input:checked + .slider-toggle {
+            background-color: #10b981;
         }
 
-        input:checked + .toggle-slider:before {
+        input:checked + .slider-toggle:before {
             transform: translateX(26px);
         }
 
-        .result-card {
-            background: white;
-            border-radius: 1rem;
-            padding: 2rem;
-            box-shadow: 0 10px 25px rgba(0, 51, 102, 0.1);
-            margin-top: 2rem;
-        }
-
-        .risk-badge {
-            display: inline-block;
-            padding: 0.5rem 1.5rem;
-            border-radius: 2rem;
-            font-weight: bold;
-            font-size: 1.1rem;
-            margin: 1rem 0;
-        }
-
-        .risk-bajo {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-        }
-
-        .risk-medio {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            color: white;
-        }
-
-        .risk-alto {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-        }
-
+        /* Spinner */
         .spinner {
-            border: 4px solid rgba(0, 51, 102, 0.1);
+            border: 3px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
-            border-top: 4px solid #003366;
-            width: 40px;
-            height: 40px;
+            border-top: 3px solid white;
+            width: 24px;
+            height: 24px;
             animation: spin 1s linear infinite;
-            margin: 0 auto;
         }
 
         @keyframes spin {
@@ -197,86 +145,52 @@ import Footer from "../../components/Footer.astro";
             100% { transform: rotate(360deg); }
         }
 
-        .btn-primary {
-            background: linear-gradient(135deg, #003366 0%, #0066cc 100%);
-            color: white;
-            padding: 1rem 2rem;
-            border-radius: 0.75rem;
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #003366 0%, #004080 100%);
+            margin: auto;
+            padding: 2rem;
+            border: 2px solid #FFB81C;
+            border-radius: 1rem;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px -5px rgba(255, 184, 28, 0.3);
+        }
+
+        .close {
+            color: #94a3b8;
+            float: right;
+            font-size: 28px;
             font-weight: bold;
-            font-size: 1.1rem;
-            border: none;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.3);
         }
 
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0, 51, 102, 0.4);
-        }
-
-        .btn-primary:active {
-            transform: translateY(0);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .analysis-section {
-            background: #f8fafc;
-            border-left: 4px solid #0066cc;
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            margin-top: 1.5rem;
-        }
-
-        .chart-container {
-            position: relative;
-            height: 350px;
-            margin: 2rem 0;
+        .close:hover {
+            color: #FFB81C;
         }
 
         .hidden {
             display: none;
-        }
-
-        .markdown-content h3 {
-            color: #003366;
-            font-size: 1.2rem;
-            font-weight: bold;
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .markdown-content p {
-            margin: 0.5rem 0;
-            line-height: 1.6;
-        }
-
-        .markdown-content ul {
-            margin-left: 1.5rem;
-            list-style-type: disc;
-        }
-
-        .markdown-content li {
-            margin: 0.25rem 0;
-        }
-
-        .markdown-content strong {
-            color: #003366;
-        }
-
-        @media (max-width: 768px) {
-            .input-card, .result-card {
-                padding: 1.5rem;
-            }
-
-            .chart-container {
-                height: 300px;
-            }
         }
     </style>
 </head>
@@ -284,390 +198,516 @@ import Footer from "../../components/Footer.astro";
 <body>
     <Header />
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- Hero Section -->
-        <div class="text-center mb-8">
-            <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
-                🎓 Predictor de Riesgo Académico
-            </h1>
-            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
-                Ingresa tus datos académicos y obtén una evaluación instantánea con consejos personalizados
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- Título -->
+        <div class="text-center mb-12">
+            <h2 class="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-300 mb-4">
+                Sistema de Predicción de Riesgo Académico
+            </h2>
+            <p class="text-lg text-blue-200 max-w-3xl mx-auto">
+                Análisis predictivo basado en <strong class="text-yellow-400">Regresión Logística</strong>
+                con consejería virtual inteligente.
             </p>
         </div>
 
-        <div class="grid md:grid-cols-2 gap-8">
-            <!-- Formulario de Entrada -->
-            <div class="input-card">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6">📊 Tus Datos Académicos</h2>
-                
-                <form id="predictionForm">
+        <!-- Layout 2 columnas -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+            <!-- COLUMNA IZQUIERDA: Formulario -->
+            <div class="card">
+                <h3 class="text-2xl font-bold text-yellow-400 mb-6 flex items-center gap-2">
+                    <span class="text-3xl">📊</span>
+                    Datos del Estudiante
+                </h3>
+
+                <form id="prediction-form" class="space-y-6">
                     <!-- Asistencia -->
-                    <div class="slider-container">
-                        <div class="slider-label">
-                            <span>📅 Promedio de Asistencia</span>
-                            <span class="slider-value" id="asistencia-value">85%</span>
-                        </div>
-                        <input 
-                            type="range" 
-                            id="asistencia" 
-                            name="asistencia" 
-                            min="0" 
-                            max="100" 
-                            value="85" 
-                            step="1"
-                        />
-                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-300 mb-2">
+                            📅 Promedio de Asistencia:
+                            <span id="asistencia-value" class="text-yellow-400 text-lg">85%</span>
+                        </label>
+                        <input type="range" id="asistencia" min="0" max="100" value="85" step="0.1">
+                        <div class="flex justify-between text-xs text-slate-500 mt-1">
                             <span>0%</span>
+                            <span>50%</span>
                             <span>100%</span>
                         </div>
                     </div>
 
                     <!-- Seguimiento -->
-                    <div class="slider-container">
-                        <div class="slider-label">
-                            <span>📈 Promedio de Seguimiento</span>
-                            <span class="slider-value" id="seguimiento-value">3.5</span>
-                        </div>
-                        <input 
-                            type="range" 
-                            id="seguimiento" 
-                            name="seguimiento" 
-                            min="0" 
-                            max="5" 
-                            value="3.5" 
-                            step="0.1"
-                        />
-                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-300 mb-2">
+                            📈 Promedio de Seguimiento:
+                            <span id="seguimiento-value" class="text-yellow-400 text-lg">3.5</span>
+                        </label>
+                        <input type="range" id="seguimiento" min="0" max="5" value="3.5" step="0.1">
+                        <div class="flex justify-between text-xs text-slate-500 mt-1">
                             <span>0.0</span>
+                            <span>2.5</span>
                             <span>5.0</span>
                         </div>
                     </div>
 
                     <!-- Nota Parcial -->
-                    <div class="slider-container">
-                        <div class="slider-label">
-                            <span>📝 Nota Parcial 1</span>
-                            <span class="slider-value" id="parcial-value">3.2</span>
-                        </div>
-                        <input 
-                            type="range" 
-                            id="parcial" 
-                            name="parcial" 
-                            min="0" 
-                            max="5" 
-                            value="3.2" 
-                            step="0.1"
-                        />
-                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-300 mb-2">
+                            📝 Nota Parcial 1:
+                            <span id="parcial-value" class="text-yellow-400 text-lg">3.2</span>
+                        </label>
+                        <input type="range" id="parcial" min="0" max="5" value="3.2" step="0.1">
+                        <div class="flex justify-between text-xs text-slate-500 mt-1">
                             <span>0.0</span>
+                            <span>2.5</span>
                             <span>5.0</span>
                         </div>
                     </div>
 
                     <!-- Logins -->
-                    <div class="slider-container">
-                        <div class="slider-label">
-                            <span>💻 Inicios de Sesión en Plataforma</span>
-                            <span class="slider-value" id="logins-value">42</span>
-                        </div>
-                        <input 
-                            type="range" 
-                            id="logins" 
-                            name="logins" 
-                            min="0" 
-                            max="100" 
-                            value="42" 
-                            step="1"
-                        />
-                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-300 mb-2">
+                            💻 Inicios de Sesión:
+                            <span id="logins-value" class="text-yellow-400 text-lg">42</span>
+                        </label>
+                        <input type="range" id="logins" min="0" max="100" value="42" step="1">
+                        <div class="flex justify-between text-xs text-slate-500 mt-1">
                             <span>0</span>
+                            <span>50</span>
                             <span>100</span>
                         </div>
                     </div>
 
                     <!-- Tutorías -->
-                    <div class="slider-container">
-                        <div class="slider-label">
-                            <span>👨‍🏫 Uso de Tutorías</span>
-                            <span class="slider-value" id="tutorias-value">No</span>
-                        </div>
-                        <div class="toggle-container">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-300 mb-3">
+                            👨‍🏫 Uso de Tutorías
+                        </label>
+                        <div class="flex items-center gap-4">
+                            <span class="text-slate-400">No</span>
                             <label class="toggle-switch">
-                                <input type="checkbox" id="tutorias" name="tutorias">
-                                <span class="toggle-slider"></span>
+                                <input type="checkbox" id="tutorias" checked>
+                                <span class="slider-toggle"></span>
                             </label>
-                            <span class="text-gray-600">¿Has usado tutorías?</span>
+                            <span class="text-yellow-400 font-semibold">Sí</span>
                         </div>
                     </div>
 
-                    <!-- Botón de Predicción -->
-                    <button 
-                        type="submit" 
-                        id="predictBtn"
-                        class="btn-primary w-full mt-6"
-                    >
-                        🚀 Analizar Mi Riesgo Académico
+                    <!-- Botón -->
+                    <button type="submit" id="analyze-btn"
+                        class="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 font-bold py-4 px-6 rounded-lg hover:from-yellow-500 hover:to-yellow-600 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 shadow-lg">
+                        <span class="text-2xl">🚀</span>
+                        <span>Analizar Riesgo Académico</span>
                     </button>
-
-                    <!-- Loading Spinner -->
-                    <div id="loading" class="hidden mt-4">
-                        <div class="spinner"></div>
-                        <p class="text-center mt-2 text-gray-600">Analizando tus datos...</p>
-                    </div>
                 </form>
             </div>
 
-            <!-- Resultados -->
-            <div id="resultsContainer" class="hidden">
-                <div class="result-card">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-4">📊 Resultado de tu Predicción</h2>
-                    
-                    <!-- Probabilidad de Riesgo -->
-                    <div class="text-center py-6">
-                        <p class="text-gray-600 mb-2">Probabilidad de Reprobación</p>
-                        <div class="text-5xl font-bold text-gray-800" id="porcentaje-riesgo">--</div>
-                        <div id="nivel-riesgo-badge" class="mt-4"></div>
-                    </div>
+            <!-- COLUMNA DERECHA: Resultados -->
+            <div class="space-y-6">
 
-                    <!-- Gráfico Radar -->
-                    <div class="chart-container">
-                        <canvas id="radarChart"></canvas>
-                    </div>
-
-                    <!-- Análisis IA -->
-                    <div id="analisis-ia" class="analysis-section markdown-content">
-                        <!-- Se llenará con JavaScript -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Placeholder cuando no hay resultados -->
-            <div id="noResultsPlaceholder" class="input-card">
-                <div class="text-center py-12">
+                <!-- Mensaje inicial -->
+                <div id="initial-message" class="card text-center py-12">
                     <div class="text-6xl mb-4">📈</div>
-                    <h3 class="text-xl font-bold text-gray-800 mb-2">Esperando tus datos...</h3>
-                    <p class="text-gray-600">
-                        Ingresa tu información académica y presiona "Analizar" para ver tu predicción
-                    </p>
+                    <h3 class="text-xl font-semibold text-slate-300 mb-2">Esperando análisis...</h3>
+                    <p class="text-slate-400">Completa el formulario y presiona "Analizar"</p>
+                </div>
+
+                <!-- Loading -->
+                <div id="loading-indicator" class="hidden card text-center py-12">
+                    <div class="spinner mx-auto mb-4"></div>
+                    <p class="text-lg text-slate-300">Analizando datos...</p>
+                    <p class="text-sm text-slate-400 mt-2">Calculando probabilidades...</p>
+                </div>
+
+                <!-- Resultados -->
+                <div id="results-container" class="hidden space-y-6">
+
+                    <!-- Velocímetro de riesgo -->
+                    <div class="card">
+                        <h3 class="text-xl font-bold text-yellow-400 mb-4 text-center">
+                            ⚠️ Nivel de Riesgo
+                        </h3>
+                        <div class="max-w-xs mx-auto">
+                            <canvas id="gauge-chart"></canvas>
+                        </div>
+                        <div class="text-center mt-4">
+                            <div class="text-5xl font-bold" id="risk-percentage">0%</div>
+                            <div class="text-lg text-slate-300 mt-2" id="risk-level">Calculando...</div>
+                        </div>
+                    </div>
+
+                    <!-- Gráfico de Radar -->
+                    <div class="card">
+                        <h3 class="text-xl font-bold text-yellow-400 mb-4 text-center">
+                            📊 Perfil del Estudiante
+                        </h3>
+                        <canvas id="radar-chart"></canvas>
+                        <p class="text-xs text-slate-400 text-center mt-4">
+                            <span class="text-yellow-400">●</span> Tu perfil vs
+                            <span class="text-blue-400">●</span> Promedio aprobados
+                        </p>
+                    </div>
+
+                    <!-- Análisis del Consejero -->
+                    <div class="card">
+                        <h3 class="text-xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
+                            <span class="text-2xl">💡</span>
+                            Consejero Virtual
+                        </h3>
+                        <div id="ia-analysis" class="text-slate-300 leading-relaxed">
+                            Generando análisis personalizado...
+                        </div>
+                    </div>
+
+                    <!-- Botón detalles matemáticos -->
+                    <button id="show-math-btn"
+                        class="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 px-6 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg">
+                        <span class="text-xl">🧮</span>
+                        <span>Ver Detalles Matemáticos de la Predicción</span>
+                    </button>
+
                 </div>
             </div>
         </div>
     </main>
 
+    <!-- Modal Detalles Matemáticos -->
+    <div id="math-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="close-modal">&times;</span>
+            <h2 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 mb-6 text-center">
+                🧮 Detalles Matemáticos de la Predicción
+            </h2>
+
+            <div class="space-y-6">
+                <!-- Fórmulas -->
+                <div class="bg-slate-800 p-6 rounded-lg border border-yellow-400">
+                    <h3 class="text-xl font-bold text-yellow-400 mb-4">📐 Fórmulas del Modelo</h3>
+
+                    <div class="mb-4">
+                        <p class="text-sm text-slate-300 mb-2">1. Cálculo del Logit (z):</p>
+                        <div id="formula-logit" class="text-center py-3 bg-slate-900 rounded text-white"></div>
+                    </div>
+
+                    <div>
+                        <p class="text-sm text-slate-300 mb-2">2. Función Sigmoide (Probabilidad):</p>
+                        <div id="formula-sigmoide" class="text-center py-3 bg-slate-900 rounded text-white"></div>
+                    </div>
+                </div>
+
+                <!-- Tabla de cálculo -->
+                <div class="bg-slate-800 p-6 rounded-lg border border-yellow-400">
+                    <h3 class="text-xl font-bold text-yellow-400 mb-4">📊 Tabla de Cálculo</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-slate-600">
+                                    <th class="text-left py-2 px-3 text-slate-300">Variable</th>
+                                    <th class="text-center py-2 px-3 text-slate-300">Valor Escalado (xᵢ)</th>
+                                    <th class="text-center py-2 px-3 text-slate-300">Coeficiente (βᵢ)</th>
+                                    <th class="text-center py-2 px-3 text-slate-300">Impacto (xᵢ × βᵢ)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="math-table-body">
+                                <!-- Se llena dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Cálculos finales -->
+                <div class="bg-slate-800 p-6 rounded-lg border border-yellow-400">
+                    <h3 class="text-xl font-bold text-yellow-400 mb-4">🔢 Cálculos Finales</h3>
+                    <div class="space-y-3 text-slate-300">
+                        <div class="bg-slate-900 p-3 rounded">
+                            <p class="text-sm text-slate-400 mb-1">Intercepto (β₀):</p>
+                            <p class="font-mono text-yellow-400" id="intercepto-value">0.0000</p>
+                        </div>
+                        <div class="bg-slate-900 p-3 rounded">
+                            <p class="text-sm text-slate-400 mb-1">Cálculo de z:</p>
+                            <p class="font-mono text-sm" id="calculo-logit">z = ...</p>
+                        </div>
+                        <div class="bg-slate-900 p-3 rounded">
+                            <p class="text-sm text-slate-400 mb-1">Cálculo de Probabilidad:</p>
+                            <p class="font-mono text-sm" id="calculo-probabilidad">P = ...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center text-sm text-slate-400 italic">
+                    <p>Este modelo usa <strong class="text-purple-400">Regresión Logística</strong> con <strong class="text-purple-400">StandardScaler</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <Footer />
 
     <script>
-        // Variables globales
-        let radarChartInstance = null;
+        // Configuración
+        const API_URL = 'https://academic-risk-predictor-api.onrender.com';
 
-        // Actualizar valores de los sliders
+        // Variables globales
+        let radarChart = null;
+        let gaugeChart = null;
+        let currentPrediction = null;
+
+        // Actualizar sliders
         document.getElementById('asistencia').addEventListener('input', (e) => {
             document.getElementById('asistencia-value').textContent = e.target.value + '%';
         });
 
         document.getElementById('seguimiento').addEventListener('input', (e) => {
-            document.getElementById('seguimiento-value').textContent = parseFloat(e.target.value).toFixed(1);
+            document.getElementById('seguimiento-value').textContent = e.target.value;
         });
 
         document.getElementById('parcial').addEventListener('input', (e) => {
-            document.getElementById('parcial-value').textContent = parseFloat(e.target.value).toFixed(1);
+            document.getElementById('parcial-value').textContent = e.target.value;
         });
 
         document.getElementById('logins').addEventListener('input', (e) => {
             document.getElementById('logins-value').textContent = e.target.value;
         });
 
-        document.getElementById('tutorias').addEventListener('change', (e) => {
-            document.getElementById('tutorias-value').textContent = e.target.checked ? 'Sí' : 'No';
+        // Form submit
+        document.getElementById('prediction-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await realizarPrediccion();
         });
 
-        // Manejar el formulario
-        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+        // Modal handlers
+        document.getElementById('show-math-btn').addEventListener('click', () => {
+            mostrarDetallesMatematicos();
+            document.getElementById('math-modal').classList.add('show');
+        });
 
-            // Obtener valores del formulario
-            const data = {
-                promedio_asistencia: parseFloat(document.getElementById('asistencia').value),
-                promedio_seguimiento: parseFloat(document.getElementById('seguimiento').value),
-                nota_parcial_1: parseFloat(document.getElementById('parcial').value),
-                inicios_sesion_plataforma: parseInt(document.getElementById('logins').value),
-                uso_tutorias: document.getElementById('tutorias').checked ? 1 : 0
-            };
+        document.getElementById('close-modal').addEventListener('click', () => {
+            document.getElementById('math-modal').classList.remove('show');
+        });
 
-            // Mostrar loading
-            document.getElementById('predictBtn').disabled = true;
-            document.getElementById('loading').classList.remove('hidden');
-            document.getElementById('resultsContainer').classList.add('hidden');
-            document.getElementById('noResultsPlaceholder').classList.add('hidden');
+        window.addEventListener('click', (e) => {
+            const modal = document.getElementById('math-modal');
+            if (e.target === modal) {
+                modal.classList.remove('show');
+            }
+        });
 
+        // Predicción
+        async function realizarPrediccion() {
             try {
-                // Llamar al API
-                const response = await fetch('https://academic-risk-predictor-api.onrender.com/predict', {
+                document.getElementById('initial-message').classList.add('hidden');
+                document.getElementById('results-container').classList.add('hidden');
+                document.getElementById('loading-indicator').classList.remove('hidden');
+
+                const data = {
+                    promedio_asistencia: parseFloat(document.getElementById('asistencia').value),
+                    promedio_seguimiento: parseFloat(document.getElementById('seguimiento').value),
+                    nota_parcial_1: parseFloat(document.getElementById('parcial').value),
+                    inicios_sesion_plataforma: parseInt(document.getElementById('logins').value),
+                    uso_tutorias: document.getElementById('tutorias').checked ? 1 : 0
+                };
+
+                const response = await fetch(`${API_URL}/predict`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
 
-                if (!response.ok) {
-                    throw new Error('Error en la predicción');
-                }
+                if (!response.ok) throw new Error('Error en la predicción');
 
                 const result = await response.json();
-
-                // Mostrar resultados
+                currentPrediction = result;
                 mostrarResultados(result);
 
             } catch (error) {
                 console.error('Error:', error);
-                alert('Hubo un error al realizar la predicción. Asegúrate de que el backend esté corriendo en http://localhost:8000');
-            } finally {
-                // Ocultar loading
-                document.getElementById('predictBtn').disabled = false;
-                document.getElementById('loading').classList.add('hidden');
+                alert('Error al realizar la predicción. El backend puede estar "dormido" (plan gratuito). Espera 30 segundos e intenta de nuevo.');
+                document.getElementById('loading-indicator').classList.add('hidden');
+                document.getElementById('initial-message').classList.remove('hidden');
             }
-        });
-
-        function mostrarResultados(result) {
-            // Mostrar contenedor de resultados
-            document.getElementById('resultsContainer').classList.remove('hidden');
-            document.getElementById('noResultsPlaceholder').classList.add('hidden');
-
-            // Scroll suave hacia los resultados
-            document.getElementById('resultsContainer').scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'nearest' 
-            });
-
-            // Porcentaje de riesgo
-            document.getElementById('porcentaje-riesgo').textContent = 
-                result.porcentaje_riesgo.toFixed(1) + '%';
-
-            // Badge de nivel de riesgo
-            const badgeContainer = document.getElementById('nivel-riesgo-badge');
-            let badgeClass = '';
-            let badgeText = '';
-
-            if (result.nivel_riesgo === 'BAJO') {
-                badgeClass = 'risk-bajo';
-                badgeText = '✅ Riesgo BAJO';
-            } else if (result.nivel_riesgo === 'MEDIO') {
-                badgeClass = 'risk-medio';
-                badgeText = '⚠️ Riesgo MEDIO';
-            } else {
-                badgeClass = 'risk-alto';
-                badgeText = '🚨 Riesgo ALTO';
-            }
-
-            badgeContainer.innerHTML = `<span class="risk-badge ${badgeClass}">${badgeText}</span>`;
-
-            // Crear o actualizar gráfico radar
-            crearGraficoRadar(result.datos_radar);
-
-            // Análisis IA (convertir markdown a HTML)
-            const analisisContainer = document.getElementById('analisis-ia');
-            analisisContainer.innerHTML = marked.parse(result.analisis_ia);
         }
 
-        function crearGraficoRadar(datosRadar) {
-            const ctx = document.getElementById('radarChart');
+        // Mostrar resultados
+        function mostrarResultados(data) {
+            document.getElementById('loading-indicator').classList.add('hidden');
+            document.getElementById('results-container').classList.remove('hidden');
 
-            // Destruir gráfico anterior si existe
-            if (radarChartInstance) {
-                radarChartInstance.destroy();
+            const porcentaje = Math.round(data.porcentaje_riesgo);
+            document.getElementById('risk-percentage').textContent = `${porcentaje}%`;
+            document.getElementById('risk-level').textContent = `Nivel: ${data.nivel_riesgo}`;
+
+            const riskPercentageEl = document.getElementById('risk-percentage');
+            if (data.nivel_riesgo === 'ALTO') {
+                riskPercentageEl.className = 'text-5xl font-bold text-red-500';
+            } else if (data.nivel_riesgo === 'MEDIO') {
+                riskPercentageEl.className = 'text-5xl font-bold text-yellow-500';
+            } else {
+                riskPercentageEl.className = 'text-5xl font-bold text-green-500';
             }
 
-            radarChartInstance = new Chart(ctx, {
+            document.getElementById('ia-analysis').innerHTML = formatearAnalisis(data.analisis_ia);
+
+            crearGraficoVelocimetro(data.porcentaje_riesgo);
+            crearGraficoRadar(data.datos_radar);
+        }
+
+        // Formatear análisis
+        function formatearAnalisis(textoAnalisis) {
+            let html = textoAnalisis;
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="text-yellow-400">$1</strong>');
+           
+            html = html.split('\n').map(linea => {
+                linea = linea.trim();
+                if (!linea) return '<div class="h-3"></div>';
+
+                if (linea.match(/^(⚠️|✅|🌟|💡|⚡|💪|🎉)/)) {
+                    return `<div class="text-lg font-bold mb-2 mt-4">${linea}</div>`;
+                }
+
+                if (linea.startsWith('•')) {
+                    return `<div class="ml-4 mb-2 flex items-start">
+                        <span class="text-yellow-400 mr-2">●</span>
+                        <span>${linea.substring(1).trim()}</span>
+                    </div>`;
+                }
+
+                if (linea.startsWith('   •')) {
+                    return `<div class="ml-8 mb-1 flex items-start text-sm">
+                        <span class="text-yellow-300 mr-2">→</span>
+                        <span>${linea.substring(4).trim()}</span>
+                    </div>`;
+                }
+
+                if (linea === '---') {
+                    return '<hr class="my-4 border-slate-600">';
+                }
+
+                return `<div class="mb-2">${linea}</div>`;
+            }).join('');
+
+            return html;
+        }
+
+        // Gráfico velocímetro
+        function crearGraficoVelocimetro(porcentajeRiesgo) {
+            const ctx = document.getElementById('gauge-chart').getContext('2d');
+
+            if (gaugeChart) gaugeChart.destroy();
+
+            let color;
+            if (porcentajeRiesgo >= 70) color = 'rgb(239, 68, 68)';
+            else if (porcentajeRiesgo >= 40) color = 'rgb(255, 184, 28)';
+            else color = 'rgb(34, 197, 94)';
+
+            gaugeChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [porcentajeRiesgo, 100 - porcentajeRiesgo],
+                        backgroundColor: [color, 'rgba(71, 85, 105, 0.3)'],
+                        borderWidth: 0,
+                        borderRadius: 10
+                    }]
+                },
+                options: {
+                    circumference: 180,
+                    rotation: -90,
+                    cutout: '75%',
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    animation: { duration: 1500 }
+                }
+            });
+        }
+
+        // Gráfico radar
+        function crearGraficoRadar(datosRadar) {
+            const ctx = document.getElementById('radar-chart').getContext('2d');
+
+            if (radarChart) radarChart.destroy();
+
+            radarChart = new Chart(ctx, {
                 type: 'radar',
                 data: {
                     labels: datosRadar.labels,
                     datasets: [
                         {
-                            label: 'Tus Datos',
+                            label: 'Tu Perfil',
                             data: datosRadar.estudiante,
-                            fill: true,
-                            backgroundColor: 'rgba(0, 102, 204, 0.2)',
-                            borderColor: '#0066cc',
+                            backgroundColor: 'rgba(255, 184, 28, 0.2)',
+                            borderColor: 'rgb(255, 184, 28)',
                             borderWidth: 2,
-                            pointBackgroundColor: '#0066cc',
-                            pointBorderColor: '#fff',
-                            pointHoverBackgroundColor: '#fff',
-                            pointHoverBorderColor: '#0066cc',
-                            pointRadius: 4,
-                            pointHoverRadius: 6
+                            pointBackgroundColor: 'rgb(255, 184, 28)'
                         },
                         {
                             label: 'Promedio Aprobados',
                             data: datosRadar.promedio_aprobado,
-                            fill: true,
-                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(96, 165, 250, 0.2)',
+                            borderColor: 'rgb(96, 165, 250)',
                             borderWidth: 2,
-                            pointBackgroundColor: '#10b981',
-                            pointBorderColor: '#fff',
-                            pointHoverBackgroundColor: '#fff',
-                            pointHoverBorderColor: '#10b981',
-                            pointRadius: 4,
-                            pointHoverRadius: 6
+                            pointBackgroundColor: 'rgb(96, 165, 250)'
                         }
                     ]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
                     scales: {
                         r: {
-                            angleLines: {
-                                color: 'rgba(0, 0, 0, 0.1)'
-                            },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
-                            },
-                            pointLabels: {
-                                font: {
-                                    size: 12,
-                                    weight: 'bold'
-                                },
-                                color: '#1e293b'
-                            },
-                            ticks: {
-                                display: false
-                            },
-                            suggestedMin: 0,
-                            suggestedMax: 100
+                            beginAtZero: true,
+                            ticks: { color: '#94a3b8', backdropColor: 'transparent' },
+                            grid: { color: 'rgba(148, 163, 184, 0.3)' },
+                            pointLabels: { color: '#e2e8f0', font: { size: 13, weight: '600' } }
                         }
                     },
                     plugins: {
-                        legend: {
-                            display: true,
-                            position: 'bottom',
-                            labels: {
-                                font: {
-                                    size: 13,
-                                    weight: 'bold'
-                                },
-                                padding: 15,
-                                usePointStyle: true,
-                                pointStyle: 'circle'
-                            }
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                            padding: 12,
-                            titleFont: {
-                                size: 14,
-                                weight: 'bold'
-                            },
-                            bodyFont: {
-                                size: 13
-                            },
-                            borderColor: '#0066cc',
-                            borderWidth: 1
-                        }
-                    }
+                        legend: { labels: { color: '#e2e8f0' } }
+                    },
+                    animation: { duration: 1500 }
                 }
             });
+        }
+
+        // Mostrar detalles matemáticos
+        function mostrarDetallesMatematicos() {
+            if (!currentPrediction) return;
+
+            const detalles = currentPrediction.detalles_matematicos;
+
+            // Renderizar fórmulas
+            if (window.katex) {
+                katex.render(detalles.formula_logit, document.getElementById('formula-logit'), {
+                    throwOnError: false,
+                    displayMode: true
+                });
+
+                katex.render(detalles.formula_sigmoide, document.getElementById('formula-sigmoide'), {
+                    throwOnError: false,
+                    displayMode: true
+                });
+            }
+
+            // Llenar tabla
+            const featureNames = ['Asistencia', 'Seguimiento', 'Parcial 1', 'Logins', 'Tutorías'];
+            const tableBody = document.getElementById('math-table-body');
+            tableBody.innerHTML = '';
+
+            detalles.features_scaled.forEach((featScaled, index) => {
+                const coef = detalles.coeficientes[index];
+                const impacto = featScaled * coef;
+
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-700';
+                row.innerHTML = `
+                    <td class="py-2 px-3 text-slate-300">${featureNames[index]}</td>
+                    <td class="text-center py-2 px-3 font-mono text-yellow-400">${featScaled.toFixed(4)}</td>
+                    <td class="text-center py-2 px-3 font-mono text-blue-400">${coef.toFixed(4)}</td>
+                    <td class="text-center py-2 px-3 font-mono text-yellow-300">${impacto.toFixed(4)}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            // Cálculos finales
+            document.getElementById('intercepto-value').textContent = detalles.intercepto.toFixed(4);
+            document.getElementById('calculo-logit').textContent = detalles.calculo_logit_texto;
+            document.getElementById('calculo-probabilidad').textContent = detalles.calculo_probabilidad_texto;
         }
     </script>
 </body>
