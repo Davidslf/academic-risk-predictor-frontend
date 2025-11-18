@@ -1,0 +1,91 @@
+---
+import HeaderLink from "./HeaderLink.astro";
+import logoUniminuto from "../assets/Logo-uniminuto.png";
+---
+
+<header>
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <img src={logoUniminuto.src} alt="Uniminuto Logo" class="brand-logo" />
+                <span class="brand-text">Predictor Académico</span>
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <HeaderLink href="/" class="nav-link">Inicio</HeaderLink>
+                    </li>
+                    <li class="nav-item">
+                        <HeaderLink href="/prediccion-academica" class="nav-link btn-predict-nav">
+                            Realizar Predicción
+                        </HeaderLink>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+</header>
+
+<style>
+    .brand-logo {
+        height: 50px;
+        width: auto;
+        margin-right: 15px;
+        transition: transform 0.3s ease;
+    }
+    
+    .brand-logo:hover {
+        transform: scale(1.05);
+    }
+    
+    .brand-text {
+        font-weight: 700;
+        font-size: 1.3rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    @media (max-width: 576px) {
+        .brand-logo {
+            height: 40px;
+        }
+        
+        .brand-text {
+            font-size: 1rem;
+        }
+    }
+    
+    .nav-link {
+        font-weight: 500;
+        color: #495057 !important;
+        transition: all 0.3s ease;
+        padding: 8px 16px;
+        border-radius: 8px;
+    }
+    
+    .nav-link:hover {
+        color: #667eea !important;
+        background: rgba(102, 126, 234, 0.1);
+    }
+    
+    .btn-predict-nav {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white !important;
+        font-weight: 600;
+        padding: 10px 24px;
+        border-radius: 50px;
+        margin-left: 10px;
+    }
+    
+    .btn-predict-nav:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+</style>
