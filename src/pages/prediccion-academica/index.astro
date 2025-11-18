@@ -563,7 +563,7 @@ import Footer from "../../components/Footer.astro";
                 badgeText = '✅ RIESGO BAJO';
             }
 
-            document.getElementById('risk-badge').innerHTML = <span class="risk-badge ${badgeClass}">${badgeText}</span>;
+            document.getElementById('risk-badge').innerHTML = `<span class="risk-badge ${badgeClass}">${badgeText}</span>`;
             document.getElementById('ia-analysis').innerHTML = formatearAnalisis(data.analisis_ia);
 
             crearGraficoVelocimetro(data.porcentaje_riesgo, data.nivel_riesgo);
@@ -575,29 +575,29 @@ import Footer from "../../components/Footer.astro";
 
         function formatearAnalisis(texto) {
             let html = texto;
-            html = html.replace(/\\(.?)\\*/g, '<strong class="text-primary">$1</strong>');
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>');
             
             html = html.split('\\n').map(linea => {
                 linea = linea.trim();
                 if (!linea) return '<div class="mb-2"></div>';
                 
                 if (linea.match(/^(⚠️|✅|🌟|💡|⚡|💪|🎉)/)) {
-                    return <h6 class="fw-bold mt-3 mb-2">${linea}</h6>;
+                    return `<h6 class="fw-bold mt-3 mb-2">${linea}</h6>`;
                 }
                 
                 if (linea.startsWith('•')) {
-                    return <div class="ms-3 mb-1">• ${linea.substring(1).trim()}</div>;
+                    return `<div class="ms-3 mb-1">• ${linea.substring(1).trim()}</div>`;
                 }
                 
                 if (linea.startsWith('   •')) {
-                    return <div class="ms-5 mb-1 small">→ ${linea.substring(4).trim()}</div>;
+                    return `<div class="ms-5 mb-1 small">→ ${linea.substring(4).trim()}</div>`;
                 }
                 
                 if (linea === '---') {
                     return '<hr class="my-3">';
                 }
                 
-                return <p class="mb-2">${linea}</p>;
+                return `<p class="mb-2">${linea}</p>`;
             }).join('');
             
             return html;
@@ -792,7 +792,7 @@ import Footer from "../../components/Footer.astro";
             if (!pregunta || !currentPrediction) return;
 
             // Agregar mensaje del usuario
-            chatMessages.innerHTML += <div class="chat-message user">${pregunta}</div>;
+            chatMessages.innerHTML += `<div class="chat-message user">${pregunta}</div>`;
             chatInput.value = '';
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
@@ -814,12 +814,12 @@ import Footer from "../../components/Footer.astro";
                 });
 
                 const data = await response.json();
-                chatMessages.innerHTML += <div class="chat-message bot">${formatearAnalisis(data.respuesta)}</div>;
+                chatMessages.innerHTML += `<div class="chat-message bot">${formatearAnalisis(data.respuesta)}</div>`;
                 chatMessages.scrollTop = chatMessages.scrollHeight;
 
             } catch (error) {
                 console.error('Error:', error);
-                chatMessages.innerHTML += <div class="chat-message bot">Lo siento, hubo un error. Intenta de nuevo.</div>;
+                chatMessages.innerHTML += `<div class="chat-message bot">Lo siento, hubo un error. Intenta de nuevo.</div>`;
             }
         }
     </script>
