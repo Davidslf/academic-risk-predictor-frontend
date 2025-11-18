@@ -1,0 +1,288 @@
+---
+import BaseHead from "../components/BaseHead.astro";
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
+import { SITE_DESCRIPTION, SITE_TITLE } from "../consts";
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<BaseHead
+			title={SITE_TITLE + " | Inicio"}
+			description={SITE_DESCRIPTION}
+		/>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<script>
+			tailwind.config = {
+				theme: {
+					extend: {
+						colors: {
+							'primary': '#003366',
+							'secondary': '#FFB81C',
+							'accent': '#0066cc',
+						}
+					}
+				}
+			}
+		</script>
+		<style>
+			body {
+				background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+				min-height: 100vh;
+			}
+			.gradient-text {
+				background: linear-gradient(135deg, #003366 0%, #0066cc 100%);
+				-webkit-background-clip: text;
+				-webkit-text-fill-color: transparent;
+				background-clip: text;
+			}
+			.card-hover {
+				transition: all 0.3s ease;
+			}
+			.card-hover:hover {
+				transform: translateY(-5px);
+				box-shadow: 0 20px 40px rgba(0, 51, 102, 0.2);
+			}
+			.hero-section {
+				background: linear-gradient(135deg, #003366 0%, #0066cc 100%);
+				position: relative;
+				overflow: hidden;
+			}
+			.hero-section::before {
+				content: '';
+				position: absolute;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+			}
+		</style>
+	</head>
+	<body>
+		<Header />
+		
+		<!-- Hero Section -->
+		<section class="hero-section text-white py-20 relative">
+			<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+				<div class="text-center">
+					<div class="mb-6">
+						<span class="inline-block text-6xl mb-4">🎓</span>
+					</div>
+					<h1 class="text-5xl md:text-6xl font-extrabold mb-6 leading-tight">
+						Predictor de Riesgo Académico
+					</h1>
+					<p class="text-xl md:text-2xl mb-8 text-blue-100 max-w-3xl mx-auto">
+						Sistema inteligente que utiliza <strong>Machine Learning</strong> para predecir 
+						el riesgo de reprobación y proporcionar consejos personalizados para el éxito académico.
+					</p>
+					<div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+						<a 
+							href="/prediccion-academica" 
+							class="bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-bold py-4 px-8 rounded-lg text-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+						>
+							🚀 Realizar Predicción Ahora
+						</a>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Características Principales -->
+		<section class="py-16 bg-white">
+			<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+				<div class="text-center mb-12">
+					<h2 class="text-4xl font-bold gradient-text mb-4">
+						¿Cómo Funciona?
+					</h2>
+					<p class="text-xl text-gray-600">
+						Nuestro sistema utiliza Regresión Logística para analizar múltiples factores
+					</p>
+				</div>
+
+				<div class="grid md:grid-cols-3 gap-8">
+					<!-- Característica 1 -->
+					<div class="bg-white rounded-xl shadow-lg p-8 card-hover border-t-4 border-blue-600">
+						<div class="text-5xl mb-4">📊</div>
+						<h3 class="text-2xl font-bold mb-3 text-gray-800">Análisis Inteligente</h3>
+						<p class="text-gray-600">
+							Evalúa 5 variables clave: asistencia, seguimiento, notas, 
+							uso de plataforma y tutorías para calcular el riesgo de reprobación.
+						</p>
+					</div>
+
+					<!-- Característica 2 -->
+					<div class="bg-white rounded-xl shadow-lg p-8 card-hover border-t-4 border-yellow-500">
+						<div class="text-5xl mb-4">🎯</div>
+						<h3 class="text-2xl font-bold mb-3 text-gray-800">Predicción Precisa</h3>
+						<p class="text-gray-600">
+							Modelo entrenado con datos reales que proporciona una probabilidad 
+							de riesgo clasificada en: BAJO, MEDIO o ALTO.
+						</p>
+					</div>
+
+					<!-- Característica 3 -->
+					<div class="bg-white rounded-xl shadow-lg p-8 card-hover border-t-4 border-green-600">
+						<div class="text-5xl mb-4">💡</div>
+						<h3 class="text-2xl font-bold mb-3 text-gray-800">Consejos Personalizados</h3>
+						<p class="text-gray-600">
+							Recibe un plan de acción específico con recomendaciones priorizadas 
+							según tu situación académica actual.
+						</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Variables del Modelo -->
+		<section class="py-16 bg-gradient-to-br from-gray-50 to-blue-50">
+			<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+				<div class="text-center mb-12">
+					<h2 class="text-4xl font-bold gradient-text mb-4">
+						Variables que Analizamos
+					</h2>
+					<p class="text-xl text-gray-600">
+						El modelo evalúa estos factores para predecir tu rendimiento
+					</p>
+				</div>
+
+				<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+					<div class="bg-white rounded-lg p-6 shadow-md hover:shadow-xl transition-shadow">
+						<div class="flex items-center mb-3">
+							<span class="text-3xl mr-3">📅</span>
+							<h3 class="text-xl font-bold text-gray-800">Asistencia</h3>
+						</div>
+						<p class="text-gray-600">Porcentaje de clases asistidas (0-100%)</p>
+					</div>
+
+					<div class="bg-white rounded-lg p-6 shadow-md hover:shadow-xl transition-shadow">
+						<div class="flex items-center mb-3">
+							<span class="text-3xl mr-3">📈</span>
+							<h3 class="text-xl font-bold text-gray-800">Seguimiento</h3>
+						</div>
+						<p class="text-gray-600">Nivel de participación y compromiso (0-5)</p>
+					</div>
+
+					<div class="bg-white rounded-lg p-6 shadow-md hover:shadow-xl transition-shadow">
+						<div class="flex items-center mb-3">
+							<span class="text-3xl mr-3">📝</span>
+							<h3 class="text-xl font-bold text-gray-800">Nota Parcial 1</h3>
+						</div>
+						<p class="text-gray-600">Calificación del primer examen (0-5)</p>
+					</div>
+
+					<div class="bg-white rounded-lg p-6 shadow-md hover:shadow-xl transition-shadow">
+						<div class="flex items-center mb-3">
+							<span class="text-3xl mr-3">💻</span>
+							<h3 class="text-xl font-bold text-gray-800">Uso de Plataforma</h3>
+						</div>
+						<p class="text-gray-600">Cantidad de inicios de sesión</p>
+					</div>
+
+					<div class="bg-white rounded-lg p-6 shadow-md hover:shadow-xl transition-shadow">
+						<div class="flex items-center mb-3">
+							<span class="text-3xl mr-3">👨‍🏫</span>
+							<h3 class="text-xl font-bold text-gray-800">Tutorías</h3>
+						</div>
+						<p class="text-gray-600">Sesiones de tutoría utilizadas (0-10)</p>
+					</div>
+
+					<div class="bg-white rounded-lg p-6 shadow-md hover:shadow-xl transition-shadow">
+						<div class="flex items-center mb-3">
+							<span class="text-3xl mr-3">🤖</span>
+							<h3 class="text-xl font-bold text-gray-800">Machine Learning</h3>
+						</div>
+						<p class="text-gray-600">Regresión Logística entrenada</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Tecnología -->
+		<section class="py-16 bg-white">
+			<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+				<div class="text-center mb-12">
+					<h2 class="text-4xl font-bold gradient-text mb-4">
+						Tecnología de Vanguardia
+					</h2>
+					<p class="text-xl text-gray-600">
+						Desarrollado con las mejores herramientas de Machine Learning
+					</p>
+				</div>
+
+				<div class="bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-8 md:p-12 text-white">
+					<div class="grid md:grid-cols-2 gap-8 items-center">
+						<div>
+							<h3 class="text-3xl font-bold mb-6">Stack Tecnológico</h3>
+							<ul class="space-y-4">
+								<li class="flex items-center">
+									<span class="text-2xl mr-3">🐍</span>
+									<div>
+										<strong>Python + FastAPI</strong>
+										<p class="text-blue-200">Backend moderno y escalable</p>
+									</div>
+								</li>
+								<li class="flex items-center">
+									<span class="text-2xl mr-3">🧠</span>
+									<div>
+										<strong>scikit-learn</strong>
+										<p class="text-blue-200">Regresión Logística optimizada</p>
+									</div>
+								</li>
+								<li class="flex items-center">
+									<span class="text-2xl mr-3">📊</span>
+									<div>
+										<strong>pandas + numpy</strong>
+										<p class="text-blue-200">Procesamiento de datos</p>
+									</div>
+								</li>
+								<li class="flex items-center">
+									<span class="text-2xl mr-3">🚀</span>
+									<div>
+										<strong>Astro</strong>
+										<p class="text-blue-200">Frontend ultrarrápido</p>
+									</div>
+								</li>
+							</ul>
+						</div>
+						<div class="bg-white/10 rounded-xl p-6 backdrop-blur-sm">
+							<h4 class="text-2xl font-bold mb-4">📐 Modelo Matemático</h4>
+							<div class="bg-white/90 text-gray-800 rounded-lg p-4 font-mono text-sm">
+								<p class="mb-2">z = β₀ + Σ(βᵢ × xᵢ)</p>
+								<p>P(riesgo) = 1 / (1 + e⁻ᶻ)</p>
+							</div>
+							<p class="mt-4 text-blue-100 text-sm">
+								Función sigmoide para clasificación binaria
+							</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Call to Action Final -->
+		<section class="py-16 bg-gradient-to-br from-yellow-50 to-orange-50">
+			<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+				<h2 class="text-4xl font-bold text-gray-800 mb-6">
+					¿Listo para Conocer tu Riesgo Académico?
+				</h2>
+				<p class="text-xl text-gray-600 mb-8">
+					Obtén tu predicción en menos de 1 minuto y recibe consejos personalizados 
+					para mejorar tu rendimiento académico.
+				</p>
+				<a 
+					href="/prediccion-academica" 
+					class="inline-block bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-bold py-4 px-12 rounded-full text-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+				>
+					🎯 Comenzar Ahora
+				</a>
+				<div class="mt-8 text-gray-500">
+					<p>✅ Gratis • ✅ Instantáneo • ✅ Sin registro</p>
+				</div>
+			</div>
+		</section>
+
+		<Footer />
+	</body>
+</html>

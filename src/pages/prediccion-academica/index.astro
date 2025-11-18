@@ -1,0 +1,674 @@
+---
+import BaseHead from "../../components/BaseHead.astro";
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <BaseHead 
+        title="Predictor de Riesgo Académico | Realizar Predicción"
+        description="Ingresa tus datos académicos y obtén una predicción instantánea de tu riesgo de reprobación con consejos personalizados."
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        .input-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 10px 25px rgba(0, 51, 102, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .input-card:hover {
+            box-shadow: 0 15px 35px rgba(0, 51, 102, 0.15);
+        }
+
+        .slider-container {
+            margin-bottom: 1.5rem;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .slider-value {
+            background: linear-gradient(135deg, #003366 0%, #0066cc 100%);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 10px;
+            border-radius: 5px;
+            background: #e2e8f0;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        input[type="range"]:hover {
+            background: #cbd5e1;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #003366 0%, #0066cc 100%);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.4);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #003366 0%, #0066cc 100%);
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0, 51, 102, 0.3);
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 56px;
+            height: 30px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cbd5e1;
+            transition: 0.4s;
+            border-radius: 30px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 2rem;
+            box-shadow: 0 10px 25px rgba(0, 51, 102, 0.1);
+            margin-top: 2rem;
+        }
+
+        .risk-badge {
+            display: inline-block;
+            padding: 0.5rem 1.5rem;
+            border-radius: 2rem;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin: 1rem 0;
+        }
+
+        .risk-bajo {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .risk-medio {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .risk-alto {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 51, 102, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid #003366;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #003366 0%, #0066cc 100%);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            font-weight: bold;
+            font-size: 1.1rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 51, 102, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .analysis-section {
+            background: #f8fafc;
+            border-left: 4px solid #0066cc;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 350px;
+            margin: 2rem 0;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .markdown-content h3 {
+            color: #003366;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .markdown-content p {
+            margin: 0.5rem 0;
+            line-height: 1.6;
+        }
+
+        .markdown-content ul {
+            margin-left: 1.5rem;
+            list-style-type: disc;
+        }
+
+        .markdown-content li {
+            margin: 0.25rem 0;
+        }
+
+        .markdown-content strong {
+            color: #003366;
+        }
+
+        @media (max-width: 768px) {
+            .input-card, .result-card {
+                padding: 1.5rem;
+            }
+
+            .chart-container {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <Header />
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Hero Section -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
+                🎓 Predictor de Riesgo Académico
+            </h1>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                Ingresa tus datos académicos y obtén una evaluación instantánea con consejos personalizados
+            </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-8">
+            <!-- Formulario de Entrada -->
+            <div class="input-card">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">📊 Tus Datos Académicos</h2>
+                
+                <form id="predictionForm">
+                    <!-- Asistencia -->
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>📅 Promedio de Asistencia</span>
+                            <span class="slider-value" id="asistencia-value">85%</span>
+                        </div>
+                        <input 
+                            type="range" 
+                            id="asistencia" 
+                            name="asistencia" 
+                            min="0" 
+                            max="100" 
+                            value="85" 
+                            step="1"
+                        />
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>0%</span>
+                            <span>100%</span>
+                        </div>
+                    </div>
+
+                    <!-- Seguimiento -->
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>📈 Promedio de Seguimiento</span>
+                            <span class="slider-value" id="seguimiento-value">3.5</span>
+                        </div>
+                        <input 
+                            type="range" 
+                            id="seguimiento" 
+                            name="seguimiento" 
+                            min="0" 
+                            max="5" 
+                            value="3.5" 
+                            step="0.1"
+                        />
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>0.0</span>
+                            <span>5.0</span>
+                        </div>
+                    </div>
+
+                    <!-- Nota Parcial -->
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>📝 Nota Parcial 1</span>
+                            <span class="slider-value" id="parcial-value">3.2</span>
+                        </div>
+                        <input 
+                            type="range" 
+                            id="parcial" 
+                            name="parcial" 
+                            min="0" 
+                            max="5" 
+                            value="3.2" 
+                            step="0.1"
+                        />
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>0.0</span>
+                            <span>5.0</span>
+                        </div>
+                    </div>
+
+                    <!-- Logins -->
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>💻 Inicios de Sesión en Plataforma</span>
+                            <span class="slider-value" id="logins-value">42</span>
+                        </div>
+                        <input 
+                            type="range" 
+                            id="logins" 
+                            name="logins" 
+                            min="0" 
+                            max="100" 
+                            value="42" 
+                            step="1"
+                        />
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>0</span>
+                            <span>100</span>
+                        </div>
+                    </div>
+
+                    <!-- Tutorías -->
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>👨‍🏫 Uso de Tutorías</span>
+                            <span class="slider-value" id="tutorias-value">No</span>
+                        </div>
+                        <div class="toggle-container">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="tutorias" name="tutorias">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span class="text-gray-600">¿Has usado tutorías?</span>
+                        </div>
+                    </div>
+
+                    <!-- Botón de Predicción -->
+                    <button 
+                        type="submit" 
+                        id="predictBtn"
+                        class="btn-primary w-full mt-6"
+                    >
+                        🚀 Analizar Mi Riesgo Académico
+                    </button>
+
+                    <!-- Loading Spinner -->
+                    <div id="loading" class="hidden mt-4">
+                        <div class="spinner"></div>
+                        <p class="text-center mt-2 text-gray-600">Analizando tus datos...</p>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Resultados -->
+            <div id="resultsContainer" class="hidden">
+                <div class="result-card">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">📊 Resultado de tu Predicción</h2>
+                    
+                    <!-- Probabilidad de Riesgo -->
+                    <div class="text-center py-6">
+                        <p class="text-gray-600 mb-2">Probabilidad de Reprobación</p>
+                        <div class="text-5xl font-bold text-gray-800" id="porcentaje-riesgo">--</div>
+                        <div id="nivel-riesgo-badge" class="mt-4"></div>
+                    </div>
+
+                    <!-- Gráfico Radar -->
+                    <div class="chart-container">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+
+                    <!-- Análisis IA -->
+                    <div id="analisis-ia" class="analysis-section markdown-content">
+                        <!-- Se llenará con JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Placeholder cuando no hay resultados -->
+            <div id="noResultsPlaceholder" class="input-card">
+                <div class="text-center py-12">
+                    <div class="text-6xl mb-4">📈</div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">Esperando tus datos...</h3>
+                    <p class="text-gray-600">
+                        Ingresa tu información académica y presiona "Analizar" para ver tu predicción
+                    </p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <Footer />
+
+    <script>
+        // Variables globales
+        let radarChartInstance = null;
+
+        // Actualizar valores de los sliders
+        document.getElementById('asistencia').addEventListener('input', (e) => {
+            document.getElementById('asistencia-value').textContent = e.target.value + '%';
+        });
+
+        document.getElementById('seguimiento').addEventListener('input', (e) => {
+            document.getElementById('seguimiento-value').textContent = parseFloat(e.target.value).toFixed(1);
+        });
+
+        document.getElementById('parcial').addEventListener('input', (e) => {
+            document.getElementById('parcial-value').textContent = parseFloat(e.target.value).toFixed(1);
+        });
+
+        document.getElementById('logins').addEventListener('input', (e) => {
+            document.getElementById('logins-value').textContent = e.target.value;
+        });
+
+        document.getElementById('tutorias').addEventListener('change', (e) => {
+            document.getElementById('tutorias-value').textContent = e.target.checked ? 'Sí' : 'No';
+        });
+
+        // Manejar el formulario
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Obtener valores del formulario
+            const data = {
+                promedio_asistencia: parseFloat(document.getElementById('asistencia').value),
+                promedio_seguimiento: parseFloat(document.getElementById('seguimiento').value),
+                nota_parcial_1: parseFloat(document.getElementById('parcial').value),
+                inicios_sesion_plataforma: parseInt(document.getElementById('logins').value),
+                uso_tutorias: document.getElementById('tutorias').checked ? 1 : 0
+            };
+
+            // Mostrar loading
+            document.getElementById('predictBtn').disabled = true;
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('resultsContainer').classList.add('hidden');
+            document.getElementById('noResultsPlaceholder').classList.add('hidden');
+
+            try {
+                // Llamar al API
+                const response = await fetch('http://localhost:8000/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error en la predicción');
+                }
+
+                const result = await response.json();
+
+                // Mostrar resultados
+                mostrarResultados(result);
+
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Hubo un error al realizar la predicción. Asegúrate de que el backend esté corriendo en http://localhost:8000');
+            } finally {
+                // Ocultar loading
+                document.getElementById('predictBtn').disabled = false;
+                document.getElementById('loading').classList.add('hidden');
+            }
+        });
+
+        function mostrarResultados(result) {
+            // Mostrar contenedor de resultados
+            document.getElementById('resultsContainer').classList.remove('hidden');
+            document.getElementById('noResultsPlaceholder').classList.add('hidden');
+
+            // Scroll suave hacia los resultados
+            document.getElementById('resultsContainer').scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'nearest' 
+            });
+
+            // Porcentaje de riesgo
+            document.getElementById('porcentaje-riesgo').textContent = 
+                result.porcentaje_riesgo.toFixed(1) + '%';
+
+            // Badge de nivel de riesgo
+            const badgeContainer = document.getElementById('nivel-riesgo-badge');
+            let badgeClass = '';
+            let badgeText = '';
+
+            if (result.nivel_riesgo === 'BAJO') {
+                badgeClass = 'risk-bajo';
+                badgeText = '✅ Riesgo BAJO';
+            } else if (result.nivel_riesgo === 'MEDIO') {
+                badgeClass = 'risk-medio';
+                badgeText = '⚠️ Riesgo MEDIO';
+            } else {
+                badgeClass = 'risk-alto';
+                badgeText = '🚨 Riesgo ALTO';
+            }
+
+            badgeContainer.innerHTML = `<span class="risk-badge ${badgeClass}">${badgeText}</span>`;
+
+            // Crear o actualizar gráfico radar
+            crearGraficoRadar(result.datos_radar);
+
+            // Análisis IA (convertir markdown a HTML)
+            const analisisContainer = document.getElementById('analisis-ia');
+            analisisContainer.innerHTML = marked.parse(result.analisis_ia);
+        }
+
+        function crearGraficoRadar(datosRadar) {
+            const ctx = document.getElementById('radarChart');
+
+            // Destruir gráfico anterior si existe
+            if (radarChartInstance) {
+                radarChartInstance.destroy();
+            }
+
+            radarChartInstance = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: datosRadar.labels,
+                    datasets: [
+                        {
+                            label: 'Tus Datos',
+                            data: datosRadar.estudiante,
+                            fill: true,
+                            backgroundColor: 'rgba(0, 102, 204, 0.2)',
+                            borderColor: '#0066cc',
+                            borderWidth: 2,
+                            pointBackgroundColor: '#0066cc',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: '#0066cc',
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        },
+                        {
+                            label: 'Promedio Aprobados',
+                            data: datosRadar.promedio_aprobado,
+                            fill: true,
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                            borderColor: '#10b981',
+                            borderWidth: 2,
+                            pointBackgroundColor: '#10b981',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: '#10b981',
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.1)'
+                            },
+                            pointLabels: {
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                },
+                                color: '#1e293b'
+                            },
+                            ticks: {
+                                display: false
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 100
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    size: 13,
+                                    weight: 'bold'
+                                },
+                                padding: 15,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                size: 13
+                            },
+                            borderColor: '#0066cc',
+                            borderWidth: 1
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

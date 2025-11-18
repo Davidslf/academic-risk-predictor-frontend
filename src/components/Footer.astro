@@ -1,0 +1,63 @@
+---
+const today = new Date();
+---
+
+<footer>
+    <div class="footer-container">
+        <div class="quick-links">
+            <a href="/">Inicio</a>
+            <a href="/prediccion-academica">Realizar Predicción</a>
+        </div>
+        <div class="footer-info">
+            <p class="font-semibold text-lg mb-2">🎓 Predictor de Riesgo Académico</p>
+            <p class="text-sm">Sistema inteligente basado en Machine Learning</p>
+        </div>
+        <div class="copyright">
+            &copy; {today.getFullYear()} Sistema de Predicción Académica. Desarrollado con Python, FastAPI y scikit-learn.
+        </div>
+    </div>
+</footer>
+<style>
+    footer {
+        padding: 3em 1em;
+        background: linear-gradient(135deg, #003366 0%, #0066cc 100%);
+        color: #ffffff;
+        text-align: center;
+        border-top: 4px solid #FFB81C;
+    }
+    .footer-container {
+        max-width: 800px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5em;
+    }
+    .quick-links {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1em 2em;
+    }
+    .quick-links a {
+        color: #ffffff;
+        text-decoration: none;
+        font-weight: 600;
+        padding: 0.5em 1em;
+        border-radius: 0.5em;
+        transition: all 0.3s ease;
+    }
+    .quick-links a:hover {
+        background: rgba(255, 184, 28, 0.2);
+        color: #FFB81C;
+    }
+    .footer-info {
+        padding: 1em 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .copyright {
+        font-size: 0.85em;
+        line-height: 1.6;
+        opacity: 0.9;
+    }
+</style>

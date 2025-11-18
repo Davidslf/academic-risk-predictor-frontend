@@ -1,0 +1,208 @@
+---
+import HeaderLink from "./HeaderLink.astro";
+---
+
+<header>
+    <div class="navbar-container">
+        <nav>
+            <div class="nav-brand">
+                <a href="/" class="logo-title">🎓 Predictor Académico</a>
+            </div>
+            <div class="nav-content">
+                <div class="internal-links">
+                    <HeaderLink href="/">Inicio</HeaderLink>
+                    <HeaderLink href="/prediccion-academica">Realizar Predicción</HeaderLink>
+                </div>
+                <div class="social-links"></div>
+                <button class="mobile-menu-button" aria-label="Menu">
+                    <span class="hamburger"></span>
+                </button>
+            </div>
+        </nav>
+    </div>
+</header>
+
+<script>
+    const mobileMenuButton = document.querySelector(".mobile-menu-button");
+    const internalLinks = document.querySelector(".internal-links");
+    const menuLinks = document.querySelectorAll(".internal-links a");
+
+    mobileMenuButton?.addEventListener("click", (e) => {
+        e.preventDefault();
+        mobileMenuButton.classList.toggle("active");
+        internalLinks?.classList.toggle("show");
+    });
+
+    // Cerrar el menú cuando se hace clic en un enlace
+    menuLinks.forEach((link) => {
+        link.addEventListener("click", () => {
+            mobileMenuButton?.classList.remove("active");
+            internalLinks?.classList.remove("show");
+        });
+    });
+</script>
+
+<style>
+    header {
+        margin: 0;
+        background: white;
+        box-shadow: 0 2px 8px var(--green-bg);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 2px solid var(--accent);
+    }
+    .navbar-container {
+        /* Controla el ancho máximo de la barra de navegación */
+        max-width: 1280px; /* Aumentado para un diseño más ancho */
+        margin: 0 auto; /* Centra el contenedor */
+        padding: 0 1em; /* Mantiene espaciado en los bordes */
+    }
+    nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5em 0;
+    }
+
+    .nav-brand {
+        flex-shrink: 0;
+    }
+
+    .logo-title {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: var(--accent);
+        text-decoration: none;
+        margin: 0;
+        padding: 0.5em 0;
+    }
+
+    .nav-content {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        flex-grow: 1;
+        gap: 1em;
+    }
+
+    /* Estilos para los enlaces de navegación */
+    .internal-links {
+        display: flex;
+    }
+    .internal-links a {
+        padding: 1em 0.8em;
+        color: var(--black);
+        border-bottom: 4px solid transparent;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .internal-links a.active {
+        border-bottom-color: var(--accent);
+        font-weight: bolder;
+    }
+
+    .social-links {
+        display: flex;
+    }
+
+    /* Estilos para el botón del menú móvil */
+    .mobile-menu-button {
+        display: none;
+        background: none;
+        border: none;
+        padding: 0.5rem;
+        cursor: pointer;
+        position: relative;
+        z-index: 20;
+    }
+
+    .hamburger {
+        display: block;
+        width: 24px;
+        height: 2px;
+        background: var(--accent);
+        position: relative;
+        transition: background 0.2s ease-out;
+    }
+
+    .hamburger::before,
+    .hamburger::after {
+        content: "";
+        position: absolute;
+        width: 100%;
+        height: 2px;
+        background: var(--accent);
+        transition: transform 0.2s ease-out;
+    }
+
+    .hamburger::before {
+        top: -6px;
+    }
+
+    .hamburger::after {
+        bottom: -6px;
+    }
+
+    .mobile-menu-button.active .hamburger {
+        background: transparent;
+    }
+
+    .mobile-menu-button.active .hamburger::before {
+        transform: rotate(45deg);
+        top: 0;
+    }
+
+    .mobile-menu-button.active .hamburger::after {
+        transform: rotate(-45deg);
+        bottom: 0;
+    }
+
+    @media (max-width: 768px) {
+        .mobile-menu-button {
+            display: block;
+            margin-left: auto;
+        }
+
+        .nav-content {
+            justify-content: flex-end;
+        }
+
+        .internal-links {
+            display: none;
+            position: fixed;
+            top: 60px; /* Ajustado para que aparezca debajo del header */
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 1rem;
+            box-shadow: 0 2px 8px var(--green-bg);
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .internal-links.show {
+            display: flex;
+        }
+
+        .internal-links a {
+            padding: 1rem;
+            width: 100%;
+            text-align: center;
+            border-bottom: 2px solid var(--green-bg);
+        }
+
+        .internal-links a:last-child {
+            border-bottom: none;
+        }
+
+        .social-links {
+            display: none;
+        }
+
+        .logo-title {
+            font-size: 1.1em;
+        }
+    }
+</style>
