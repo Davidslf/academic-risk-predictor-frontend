@@ -1,2 +1,0 @@
-export const SITE_TITLE = 'Predictor de Riesgo Académico';
-export const SITE_DESCRIPTION = 'Sistema inteligente de predicción de riesgo de reprobación utilizando Machine Learning y Regresión Logística. Analiza el desempeño estudiantil y proporciona recomendaciones personalizadas.';
