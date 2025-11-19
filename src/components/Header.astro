@@ -1,0 +1,125 @@
+---
+import logoIcon from "../assets/Logo-icono-uniminuto.jpg";
+---
+
+<header class="main-header">
+    <div class="container">
+        <div class="header-content">
+            <a href="/" class="logo-link">
+                <img src={logoIcon.src} alt="Uniminuto Logo" class="header-logo" />
+                <div class="header-text">
+                    <h1 class="header-title">Sistema de Predicción Académica</h1>
+                    <p class="header-subtitle">Uniminuto</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</header>
+
+<style>
+    .main-header {
+        background: linear-gradient(135deg, #004B93 0%, #003A75 100%);
+        box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1);
+        padding: 0.5rem 0;
+        margin: 0;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        border-bottom: 2px solid #FFB81C;
+    }
+
+    .header-content {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+    }
+
+    .logo-link {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        text-decoration: none;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .header-logo {
+        width: 40px;
+        height: 40px;
+        object-fit: contain;
+        border-radius: 5px;
+        background: white;
+        padding: 3px;
+    }
+
+    .header-text {
+        display: flex;
+        flex-direction: column;
+        gap: 0.1rem;
+    }
+
+    .header-title {
+        color: white;
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        line-height: 1.2;
+    }
+
+    .header-subtitle {
+        color: #FFB81C;
+        margin: 0;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .main-header {
+            padding: 0.4rem 0;
+        }
+
+        .logo-link {
+            gap: 0.6rem;
+        }
+
+        .header-logo {
+            width: 35px;
+            height: 35px;
+        }
+
+        .header-title {
+            font-size: 0.95rem;
+        }
+
+        .header-subtitle {
+            font-size: 0.65rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .header-logo {
+            width: 30px;
+            height: 30px;
+        }
+
+        .header-title {
+            font-size: 0.85rem;
+        }
+
+        .header-subtitle {
+            font-size: 0.6rem;
+        }
+    }
+
+    /* Print styles */
+    @media print {
+        .main-header {
+            position: relative;
+            box-shadow: none;
+            border-bottom: 1px solid #004B93;
+        }
+    }
+</style>
+
