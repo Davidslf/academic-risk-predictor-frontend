@@ -89,3 +89,20 @@ button {
         display: none !important;
     }
 }
+
+/* Asegura que el chatbot siempre esté por encima del formulario sticky en móviles */
+@media (max-width: 768px) {
+    .chatbot-container.show {
+        z-index: 1050 !important; /* Un valor más alto que sticky-top (que suele ser 1020) */
+    }
+}
+
+    /* Opcional: Si prefieres ocultar el sticky header cuando el chat está abierto para// filepath: src/styles/global.css
+// ...existing code...
+
+/* Asegura que el chatbot siempre esté por encima del formulario sticky en móviles */
+@media (max-width: 768px) {
+    .chatbot-container.show {
+        z-index: 1050 !important; /* Un valor más alto que sticky-top (que suele ser 1020) */
+    }
+}
