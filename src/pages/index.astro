@@ -1,7 +1,6 @@
 ---
 import BaseHead from "../components/BaseHead.astro";
 import Footer from "../components/Footer.astro";
-import Header from "../components/Header.astro";
 import { SITE_DESCRIPTION, SITE_TITLE } from "../consts";
 import logoIcon from "../assets/Logo-icono-uniminuto.jpg";
 ---
@@ -149,7 +148,6 @@ import logoIcon from "../assets/Logo-icono-uniminuto.jpg";
             justify-content: center;
             margin: 0 auto;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            animation: float 3s ease-in-out infinite;
         }
 
         .hero-logo {
@@ -178,12 +176,23 @@ import logoIcon from "../assets/Logo-icono-uniminuto.jpg";
                 width: 140px;
                 height: 140px;
             }
+
+            .hero-section .col-lg-6:first-child {
+                text-align: center;
+            }
+
+            .hero-section .d-flex.gap-3 {
+                justify-content: center;
+            }
+
+            .hero-section h1,
+            .hero-section p {
+                text-align: center;
+            }
         }
     </style>
 </head>
 <body>
-    <Header />
-
     <!-- Hero Section -->
     <section class="hero-section">
         <div class="container hero-content">
@@ -200,10 +209,6 @@ import logoIcon from "../assets/Logo-icono-uniminuto.jpg";
                         <a href="/prediccion-academica" class="btn btn-light btn-hero">
                             <i class="bi bi-rocket-takeoff me-2"></i>
                             Comenzar Ahora
-                        </a>
-                        <a href="#como-funciona" class="btn btn-outline-light btn-hero">
-                            <i class="bi bi-play-circle me-2"></i>
-                            Ver Cómo Funciona
                         </a>
                     </div>
                 </div>
@@ -423,52 +428,9 @@ import logoIcon from "../assets/Logo-icono-uniminuto.jpg";
                         </div>
                     </div>
                 </div>
-
-                <div class="col-md-6 col-lg-4">
-                    <div class="d-flex align-items-start">
-                        <div class="flex-shrink-0">
-                            <i class="bi bi-cpu text-secondary" style="font-size: 2.5rem;"></i>
-                        </div>
-                        <div class="flex-grow-1 ms-3">
-                            <h5 class="fw-bold">Machine Learning</h5>
-                            <p class="text-muted mb-0">Análisis inteligente con Regresión Logística.</p>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </section>
-
-    <!-- CTA Section -->
-    <section class="cta-section">
-        <div class="container text-center">
-            <div class="row justify-content-center">
-                <div class="col-lg-8">
-                    <h2 class="display-4 fw-bold mb-4">
-                        ¿Listo para Mejorar tu Rendimiento?
-                    </h2>
-                    <p class="lead mb-5 fs-4">
-                        Obtén tu análisis completo en menos de 1 minuto. Es gratis, rápido y sin registro.
-                    </p>
-                    <a href="/prediccion-academica" class="btn btn-light btn-hero btn-lg">
-                        <i class="bi bi-arrow-right-circle me-2"></i>
-                        Comenzar Análisis Gratuito
-                    </a>
-                    <div class="mt-4">
-                        <small class="opacity-75">
-                            <i class="bi bi-shield-check me-2"></i>
-                            Sin registro •
-                            <i class="bi bi-lightning me-2 ms-2"></i>
-                            Resultados instantáneos •
-                            <i class="bi bi-graph-up me-2 ms-2"></i>
-                            100% Gratuito
-                        </small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <Footer />
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

@@ -10,5 +10,11 @@ export default defineConfig({
     // Configuración de build
     build: {
         inlineStylesheets: 'auto',
-    }
+    },
+    // Habilitar source maps para debugging
+    vite: {
+        build: {
+            sourcemap: true,
+        },
+    },
 });
