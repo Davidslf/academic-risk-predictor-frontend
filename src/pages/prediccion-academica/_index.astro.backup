@@ -1,6 +1,7 @@
 ---
-import BaseHead from '../../components/BaseHead.astro';
-import Footer from '../../components/Footer.astro';
+import BaseHead from "../../components/BaseHead.astro";
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
 ---
 
 <!doctype html>
@@ -39,7 +40,6 @@ import Footer from '../../components/Footer.astro';
             body {
                 background: linear-gradient(135deg, #f6f8fb 0%, #e9ecef 100%);
                 min-height: 100vh;
-                padding-top: 30px;
             }
 
             .form-card,
@@ -121,21 +121,6 @@ import Footer from '../../components/Footer.astro';
                 position: relative;
                 height: 300px;
                 margin: 20px 0;
-            }
-
-            .gauge-container {
-                position: relative;
-                height: 250px;
-                margin: 20px auto;
-                max-width: 400px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .gauge-container canvas {
-                max-width: 100%;
-                height: auto !important;
             }
 
             /* Chatbot Styles */
@@ -237,23 +222,6 @@ import Footer from '../../components/Footer.astro';
                 border-width: 0.3rem;
             }
 
-            /* Sticky behavior para desktop */
-            @media (min-width: 992px) {
-                .form-card.sticky-top {
-                    position: sticky;
-                    top: 20px;
-                    z-index: 100;
-                }
-            }
-
-            /* En móvil, desactivar sticky */
-            @media (max-width: 991px) {
-                .form-card.sticky-top {
-                    position: relative;
-                    top: auto !important;
-                }
-            }
-
             @media (max-width: 768px) {
                 .chatbot-container {
                     width: calc(100% - 40px);
@@ -265,6 +233,8 @@ import Footer from '../../components/Footer.astro';
     </head>
 
     <body>
+        <Header />
+
         <main class="container py-5">
             <!-- Header -->
             <div class="text-center mb-5">
@@ -281,7 +251,7 @@ import Footer from '../../components/Footer.astro';
             <div class="row">
                 <!-- Formulario -->
                 <div class="col-lg-5 mb-4">
-                    <div class="form-card sticky-top">
+                    <div class="form-card sticky-top" style="top: 100px;">
                         <h4 class="fw-bold mb-4">
                             <i class="bi bi-person-circle text-primary"></i>
                             Tus Datos Académicos
@@ -496,7 +466,7 @@ import Footer from '../../components/Footer.astro';
                             </h4>
 
                             <!-- Velocímetro -->
-                            <div class="gauge-container mb-4">
+                            <div class="chart-container mb-4">
                                 <canvas id="gauge-chart"></canvas>
                             </div>
 
@@ -520,30 +490,20 @@ import Footer from '../../components/Footer.astro';
                         <!-- Gráfico de Barras Comparativo -->
                         <div class="result-card">
                             <h5 class="fw-bold mb-3">
-                                <i class="bi bi-bar-chart"></i> Asistencia a la plataforma
+                                <i class="bi bi-bar-chart"></i> Comparativa con Promedio
                             </h5>
                             <div class="chart-container" style="height: 350px;">
                                 <canvas id="bar-chart"></canvas>
                             </div>
                         </div>
 
-                        <!-- Gráfico de Notas -->
+                        <!-- Gráfico de Radar -->
                         <div class="result-card">
                             <h5 class="fw-bold mb-3">
-                                <i class="bi bi-journal-text"></i> Seguimiento y Notas
+                                <i class="bi bi-diagram-3"></i> Perfil del Estudiante
                             </h5>
-                            <div class="chart-container" style="height: 350px;">
-                                <canvas id="notes-chart"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- Gráfico de Asistencia -->
-                        <div class="result-card">
-                            <h5 class="fw-bold mb-3">
-                                <i class="bi bi-calendar-check"></i> Asistencia
-                            </h5>
-                            <div class="chart-container" style="height: 350px;">
-                                <canvas id="attendance-chart"></canvas>
+                            <div class="chart-container" style="height: 400px;">
+                                <canvas id="radar-chart"></canvas>
                             </div>
                         </div>
 
@@ -569,7 +529,7 @@ import Footer from '../../components/Footer.astro';
             </div>
         </main>
 
-        <!-- Modal Matemático (Aquí iría todo el modal HTML - mantengo el original) -->
+        <!-- Modal Matemático -->
         <div class="modal fade" id="mathModal" tabindex="-1">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
@@ -584,6 +544,7 @@ import Footer from '../../components/Footer.astro';
                             data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <!-- Introducción -->
                         <div class="alert alert-info mb-4">
                             <h6 class="fw-bold mb-2">
                                 <i class="bi bi-info-circle"></i> ¿Cómo funciona
@@ -594,10 +555,13 @@ import Footer from '../../components/Footer.astro';
                                     >Regresión Logística</strong
                                 >, un algoritmo de Machine Learning que calcula
                                 la probabilidad de que un estudiante repruebe
-                                basándose en sus datos académicos.
+                                basándose en sus datos académicos. El modelo fue
+                                entrenado con datos históricos de estudiantes
+                                para identificar patrones de riesgo.
                             </p>
                         </div>
 
+                        <!-- Fórmulas -->
                         <div class="card mb-3">
                             <div class="card-header bg-light">
                                 <h6 class="mb-0">
@@ -608,6 +572,13 @@ import Footer from '../../components/Footer.astro';
                             <div class="card-body">
                                 <p class="small text-muted mb-2">
                                     <strong>1. Cálculo del Logit (z):</strong>
+                                </p>
+                                <p class="small mb-2">
+                                    Esta fórmula combina todas tus variables
+                                    académicas (asistencia, notas, etc.) con
+                                    coeficientes que indican su importancia.
+                                    Cada variable se multiplica por su peso y se
+                                    suman para obtener un valor llamado "logit".
                                 </p>
                                 <div
                                     id="formula-logit"
@@ -620,6 +591,12 @@ import Footer from '../../components/Footer.astro';
                                         >2. Función Sigmoide (Probabilidad):</strong
                                     >
                                 </p>
+                                <p class="small mb-2">
+                                    La función sigmoide convierte el logit (que
+                                    puede ser cualquier número) en una
+                                    probabilidad entre 0% y 100%. Esta es la
+                                    probabilidad final de riesgo.
+                                </p>
                                 <div
                                     id="formula-sigmoide"
                                     class="p-3 bg-light rounded text-center"
@@ -628,6 +605,45 @@ import Footer from '../../components/Footer.astro';
                             </div>
                         </div>
 
+                        <!-- Explicación de Variables -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-book"></i> ¿Qué significa cada
+                                    variable?
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <ul class="small mb-0">
+                                    <li>
+                                        <strong>Asistencia:</strong> Tu porcentaje
+                                        de asistencia a clases. Mayor asistencia
+                                        = menor riesgo.
+                                    </li>
+                                    <li>
+                                        <strong>Seguimiento:</strong> Tu nivel de
+                                        participación en actividades, tareas y seguimiento
+                                        del curso (escala 0-5).
+                                    </li>
+                                    <li>
+                                        <strong>Parcial 1:</strong> Tu calificación
+                                        en el primer examen parcial (escala 0-5).
+                                    </li>
+                                    <li>
+                                        <strong>Logins:</strong> Número de veces
+                                        que has ingresado a la plataforma educativa.
+                                        Refleja tu compromiso.
+                                    </li>
+                                    <li>
+                                        <strong>Tutorías:</strong> Si aprovechas
+                                        (1) o no (0) las tutorías disponibles para
+                                        apoyo académico.
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Tabla -->
                         <div class="card mb-3">
                             <div class="card-header bg-light">
                                 <h6 class="mb-0">
@@ -635,6 +651,12 @@ import Footer from '../../components/Footer.astro';
                                 </h6>
                             </div>
                             <div class="card-body">
+                                <p class="small text-muted mb-3">
+                                    Aquí puedes ver cómo cada una de tus
+                                    variables contribuye al cálculo final. Los
+                                    valores están <strong>escalados</strong> (normalizados)
+                                    para que el modelo funcione correctamente.
+                                </p>
                                 <div class="table-responsive">
                                     <table class="table table-sm table-hover">
                                         <thead class="table-light">
@@ -654,9 +676,14 @@ import Footer from '../../components/Footer.astro';
                                         <tbody id="math-table-body"></tbody>
                                     </table>
                                 </div>
+                                <p class="small text-muted mb-0">
+                                    <strong>Nota:</strong> Los coeficientes positivos
+                                    aumentan el riesgo, los negativos lo disminuyen.
+                                </p>
                             </div>
                         </div>
 
+                        <!-- Cálculos -->
                         <div class="card">
                             <div class="card-header bg-light">
                                 <h6 class="mb-0">
@@ -664,6 +691,12 @@ import Footer from '../../components/Footer.astro';
                                 </h6>
                             </div>
                             <div class="card-body">
+                                <p class="small text-muted mb-3">
+                                    El <strong>intercepto</strong> es el valor base
+                                    del modelo. Los impactos de todas las variables
+                                    se suman al intercepto para calcular el logit
+                                    (z), que luego se convierte en probabilidad.
+                                </p>
                                 <div class="mb-3">
                                     <small class="text-muted"
                                         >Intercepto (β₀):</small
@@ -748,22 +781,490 @@ import Footer from '../../components/Footer.astro';
         <script
             src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
         ></script>
-        
-        <!-- ⭐ CÓDIGO REFACTORIZADO CON SOLID Y CLEAN CODE ⭐ -->
         <script>
             /**
-             * Aplicación refactorizada con arquitectura limpia
-             * - Código modularizado en archivos TypeScript separados
-             * - Debugging completo con breakpoints funcionales
-             * - Principios SOLID aplicados
-             * - Responsabilidad Única por módulo
-             * - Fácil mantenimiento y testing
+             * Aplicación refactorizada con SOLID y Clean Code
+             * El código ahora está modularizado en archivos TypeScript separados
+             * Esto permite debugging completo con breakpoints funcionales
              */
             import { appController } from '../../app/app.controller';
 
-            // Inicializar la aplicación cuando el DOM esté listo
-            appController.initialize();
+            let currentPrediction = null;
+            let gaugeChart, barChart, radarChart;
+
+            // Sliders
+            document
+                .getElementById("asistencia")
+                .addEventListener("input", (e) => {
+                    document.getElementById("asistencia-value").textContent =
+                        e.target.value + "%";
+                });
+
+            document
+                .getElementById("seguimiento")
+                .addEventListener("input", (e) => {
+                    document.getElementById("seguimiento-value").textContent =
+                        parseFloat(e.target.value).toFixed(1);
+                });
+
+            document
+                .getElementById("parcial")
+                .addEventListener("input", (e) => {
+                    document.getElementById("parcial-value").textContent =
+                        parseFloat(e.target.value).toFixed(1);
+                });
+
+            document.getElementById("logins").addEventListener("input", (e) => {
+                document.getElementById("logins-value").textContent =
+                    e.target.value;
+            });
+
+            document
+                .getElementById("tutorias")
+                .addEventListener("change", (e) => {
+                    document.getElementById("tutorias-label").textContent = e
+                        .target.checked
+                        ? "Sí, uso tutorías"
+                        : "No uso tutorías";
+                });
+
+            // Form submit
+            document
+                .getElementById("prediction-form")
+                .addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    await realizarPrediccion();
+                });
+
+            async function realizarPrediccion() {
+                try {
+                    document.getElementById("initial-message").style.display =
+                        "none";
+                    document.getElementById("results-container").style.display =
+                        "none";
+                    document.getElementById("loading").style.display = "block";
+
+                    const data = {
+                        promedio_asistencia: parseFloat(
+                            document.getElementById("asistencia").value,
+                        ),
+                        promedio_seguimiento: parseFloat(
+                            document.getElementById("seguimiento").value,
+                        ),
+                        nota_parcial_1: parseFloat(
+                            document.getElementById("parcial").value,
+                        ),
+                        inicios_sesion_plataforma: parseInt(
+                            document.getElementById("logins").value,
+                        ),
+                        uso_tutorias: document.getElementById("tutorias")
+                            .checked
+                            ? 1
+                            : 0,
+                    };
+
+                    const response = await fetch(`${API_URL}/predict`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(data),
+                    });
+
+                    if (!response.ok) throw new Error("Error en predicción");
+
+                    const result = await response.json();
+                    currentPrediction = result;
+                    mostrarResultados(result);
+                } catch (error) {
+                    console.error("Error:", error);
+                    alert(
+                        'Error al conectar con el servidor. El servicio puede estar "dormido" (plan gratuito). Espera 30 segundos e intenta de nuevo.',
+                    );
+                    document.getElementById("loading").style.display = "none";
+                    document.getElementById("initial-message").style.display =
+                        "block";
+                }
+            }
+
+            function mostrarResultados(data) {
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("results-container").style.display =
+                    "block";
+
+                const porcentaje = Math.round(data.porcentaje_riesgo);
+
+                // Calcular probabilidad de aprobar (inverso del riesgo)
+                const probAprobar = 100 - porcentaje;
+                document.getElementById("prob-aprobar").textContent =
+                    probAprobar + "%";
+
+                let badgeClass, badgeText;
+                if (data.nivel_riesgo === "ALTO") {
+                    badgeClass = "risk-alto";
+                    badgeText = "🚨 RIESGO ALTO";
+                } else if (data.nivel_riesgo === "MEDIO") {
+                    badgeClass = "risk-medio";
+                    badgeText = "⚠️ RIESGO MEDIO";
+                } else {
+                    badgeClass = "risk-bajo";
+                    badgeText = "✅ RIESGO BAJO";
+                }
+
+                document.getElementById("risk-badge").innerHTML =
+                    `<span class="risk-badge ${badgeClass}">${badgeText}</span>`;
+                document.getElementById("ia-analysis").innerHTML =
+                    formatearAnalisis(data.analisis_ia);
+
+                crearGraficoVelocimetro(
+                    data.porcentaje_riesgo,
+                    data.nivel_riesgo,
+                );
+                crearGraficoBarras(data.datos_radar);
+                crearGraficoRadar(data.datos_radar);
+
+                document
+                    .getElementById("results-container")
+                    .scrollIntoView({ behavior: "smooth" });
+            }
+
+            function formatearAnalisis(texto) {
+                let html = texto;
+                html = html.replace(
+                    /\*\*(.*?)\*\*/g,
+                    '<strong class="text-primary">$1</strong>',
+                );
+
+                // Reemplazar saltos de línea reales y literales
+                html = html.replace(/\\n/g, "\n");
+                html = html
+                    .split("\n")
+                    .map((linea) => {
+                        linea = linea.trim();
+                        if (!linea) return '<div class="mb-3"></div>';
+
+                        if (linea.match(/^(⚠️|✅|🌟|💡|⚡|💪|🎉)/)) {
+                            return `<h6 class="fw-bold mt-3 mb-2">${linea}</h6>`;
+                        }
+
+                        if (linea.startsWith("•")) {
+                            return `<div class="ms-3 mb-2">• ${linea.substring(1).trim()}</div>`;
+                        }
+
+                        if (linea.startsWith("   •")) {
+                            return `<div class="ms-5 mb-2 small">→ ${linea.substring(4).trim()}</div>`;
+                        }
+
+                        if (linea === "---") {
+                            return '<hr class="my-3">';
+                        }
+
+                        return `<p class="mb-3">${linea}</p>`;
+                    })
+                    .join("");
+
+                return html;
+            }
+
+            function crearGraficoVelocimetro(porcentaje, nivel) {
+                const ctx = document
+                    .getElementById("gauge-chart")
+                    .getContext("2d");
+
+                if (gaugeChart) gaugeChart.destroy();
+
+                let color;
+                if (nivel === "ALTO") color = "#ef4444";
+                else if (nivel === "MEDIO") color = "#f59e0b";
+                else color = "#10b981";
+
+                gaugeChart = new Chart(ctx, {
+                    type: "doughnut",
+                    data: {
+                        datasets: [
+                            {
+                                data: [porcentaje, 100 - porcentaje],
+                                backgroundColor: [color, "#e5e7eb"],
+                                borderWidth: 0,
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        aspectRatio: 2,
+                        circumference: 180,
+                        rotation: 270,
+                        cutout: "75%",
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { enabled: false },
+                        },
+                        animation: {
+                            animateRotate: true,
+                            animateScale: false,
+                        },
+                    },
+                    plugins: [
+                        {
+                            id: "textCenter",
+                            beforeDraw: (chart) => {
+                                const { width, height, ctx } = chart;
+                                ctx.restore();
+
+                                const centerX = width / 2;
+                                const centerY = height * 0.75;
+
+                                // Porcentaje
+                                ctx.font = `bold ${height / 4}px Arial`;
+                                ctx.textAlign = "center";
+                                ctx.textBaseline = "middle";
+                                ctx.fillStyle = color;
+                                ctx.fillText(
+                                    `${porcentaje}%`,
+                                    centerX,
+                                    centerY,
+                                );
+
+                                // Texto
+                                ctx.font = `${height / 15}px Arial`;
+                                ctx.fillStyle = "#6b7280";
+                                ctx.fillText(
+                                    "de Riesgo",
+                                    centerX,
+                                    centerY + height / 8,
+                                );
+
+                                ctx.save();
+                            },
+                        },
+                    ],
+                });
+            }
+
+            function crearGraficoBarras(datosRadar) {
+                const ctx = document
+                    .getElementById("bar-chart")
+                    .getContext("2d");
+
+                if (barChart) barChart.destroy();
+
+                barChart = new Chart(ctx, {
+                    type: "bar",
+                    data: {
+                        labels: datosRadar.labels,
+                        datasets: [
+                            {
+                                label: "Tus Datos",
+                                data: datosRadar.estudiante,
+                                backgroundColor: "rgba(102, 126, 234, 0.8)",
+                                borderColor: "rgb(102, 126, 234)",
+                                borderWidth: 2,
+                            },
+                            {
+                                label: "Promedio Aprobados",
+                                data: datosRadar.promedio_aprobado,
+                                backgroundColor: "rgba(16, 185, 129, 0.8)",
+                                borderColor: "rgb(16, 185, 129)",
+                                borderWidth: 2,
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: "top",
+                            },
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                            },
+                        },
+                    },
+                });
+            }
+
+            function crearGraficoRadar(datosRadar) {
+                const ctx = document
+                    .getElementById("radar-chart")
+                    .getContext("2d");
+
+                if (radarChart) radarChart.destroy();
+
+                radarChart = new Chart(ctx, {
+                    type: "radar",
+                    data: {
+                        labels: datosRadar.labels,
+                        datasets: [
+                            {
+                                label: "Tu Perfil",
+                                data: datosRadar.estudiante,
+                                backgroundColor: "rgba(102, 126, 234, 0.2)",
+                                borderColor: "rgb(102, 126, 234)",
+                                borderWidth: 2,
+                                pointBackgroundColor: "rgb(102, 126, 234)",
+                            },
+                            {
+                                label: "Promedio Aprobados",
+                                data: datosRadar.promedio_aprobado,
+                                backgroundColor: "rgba(16, 185, 129, 0.2)",
+                                borderColor: "rgb(16, 185, 129)",
+                                borderWidth: 2,
+                                pointBackgroundColor: "rgb(16, 185, 129)",
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: "top",
+                            },
+                        },
+                    },
+                });
+            }
+
+            // Modal matemático
+            document
+                .getElementById("show-math-btn")
+                .addEventListener("click", () => {
+                    if (currentPrediction) {
+                        mostrarDetallesMatematicos();
+                        new bootstrap.Modal(
+                            document.getElementById("mathModal"),
+                        ).show();
+                    }
+                });
+
+            function mostrarDetallesMatematicos() {
+                const detalles = currentPrediction.detalles_matematicos;
+
+                if (window.katex) {
+                    katex.render(
+                        detalles.formula_logit,
+                        document.getElementById("formula-logit"),
+                        {
+                            throwOnError: false,
+                            displayMode: true,
+                        },
+                    );
+
+                    katex.render(
+                        detalles.formula_sigmoide,
+                        document.getElementById("formula-sigmoide"),
+                        {
+                            throwOnError: false,
+                            displayMode: true,
+                        },
+                    );
+                }
+
+                const featureNames = [
+                    "Asistencia",
+                    "Seguimiento",
+                    "Parcial 1",
+                    "Logins",
+                    "Tutorías",
+                ];
+                const tableBody = document.getElementById("math-table-body");
+                tableBody.innerHTML = "";
+
+                detalles.features_scaled.forEach((featScaled, index) => {
+                    const coef = detalles.coeficientes[index];
+                    const impacto = featScaled * coef;
+
+                    const row = `
+                    <tr>
+                        <td>${featureNames[index]}</td>
+                        <td class="text-center font-monospace">${featScaled.toFixed(4)}</td>
+                        <td class="text-center font-monospace">${coef.toFixed(4)}</td>
+                        <td class="text-center font-monospace">${impacto.toFixed(4)}</td>
+                    </tr>
+                `;
+                    tableBody.innerHTML += row;
+                });
+
+                document.getElementById("intercepto-value").textContent =
+                    detalles.intercepto.toFixed(4);
+                document.getElementById("calculo-logit").textContent =
+                    detalles.calculo_logit_texto;
+                document.getElementById("calculo-probabilidad").textContent =
+                    detalles.calculo_probabilidad_texto;
+            }
+
+            // Chatbot
+            const chatToggle = document.getElementById("chat-toggle");
+            const chatClose = document.getElementById("chat-close");
+            const chatbot = document.getElementById("chatbot");
+            const chatSend = document.getElementById("chat-send");
+            const chatInput = document.getElementById("chat-input");
+            const chatMessages = document.getElementById("chat-messages");
+
+            chatToggle.addEventListener("click", () => {
+                chatbot.classList.add("show");
+                chatToggle.style.display = "none";
+            });
+
+            chatClose.addEventListener("click", () => {
+                chatbot.classList.remove("show");
+                chatToggle.style.display = "flex";
+            });
+
+            chatSend.addEventListener("click", () => enviarMensajeChat());
+            chatInput.addEventListener("keypress", (e) => {
+                if (e.key === "Enter") enviarMensajeChat();
+            });
+
+            async function enviarMensajeChat() {
+                const pregunta = chatInput.value.trim();
+                if (!pregunta || !currentPrediction) return;
+
+                // Agregar mensaje del usuario
+                chatMessages.innerHTML += `<div class="chat-message user">${pregunta}</div>`;
+                chatInput.value = "";
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                try {
+                    const response = await fetch(`${API_URL}/chat`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            pregunta: pregunta,
+                            datos_estudiante: {
+                                promedio_asistencia: parseFloat(
+                                    document.getElementById("asistencia").value,
+                                ),
+                                promedio_seguimiento: parseFloat(
+                                    document.getElementById("seguimiento")
+                                        .value,
+                                ),
+                                nota_parcial_1: parseFloat(
+                                    document.getElementById("parcial").value,
+                                ),
+                                inicios_sesion_plataforma: parseInt(
+                                    document.getElementById("logins").value,
+                                ),
+                                uso_tutorias: document.getElementById(
+                                    "tutorias",
+                                ).checked
+                                    ? 1
+                                    : 0,
+                            },
+                            prediccion_actual: currentPrediction,
+                        }),
+                    });
+
+                    const data = await response.json();
+                    chatMessages.innerHTML += `<div class="chat-message bot">${formatearAnalisis(data.respuesta)}</div>`;
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                } catch (error) {
+                    console.error("Error:", error);
+                    chatMessages.innerHTML += `<div class="chat-message bot">Lo siento, hubo un error. Intenta de nuevo.</div>`;
+                }
+            }
         </script>
     </body>
 </html>
-

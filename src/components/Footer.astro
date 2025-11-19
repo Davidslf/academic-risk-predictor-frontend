@@ -5,9 +5,9 @@ const today = new Date();
 
 <footer class="footer mt-5">
     <div class="container py-5">
-        <div class="row align-items-center">
+        <div class="row align-items-center justify-content-center">
             <!-- Logo Uniminuto -->
-            <div class="col-lg-4 mb-4 mb-lg-0 text-center text-lg-start">
+            <div class="col-lg-4 mb-4 mb-lg-0 text-center">
                 <img src={footerImage.src} alt="Uniminuto" class="footer-logo mb-3" />
                 <p class="text-muted small">
                     Sistema inteligente de predicción de riesgo académico basado en Machine Learning.
@@ -19,51 +19,17 @@ const today = new Date();
                     <span class="badge bg-warning text-dark">Astro</span>
                 </div>
             </div>
-            
-            <div class="col-lg-4 mb-4 mb-lg-0">
-                <h6 class="fw-bold mb-3">Enlaces Rápidos</h6>
-                <ul class="list-unstyled">
-                    <li class="mb-2">
-                        <a href="/" class="footer-link">
-                            <i class="bi bi-house-door"></i> Inicio
-                        </a>
-                    </li>
-                    <li class="mb-2">
-                        <a href="/prediccion-academica" class="footer-link">
-                            <i class="bi bi-graph-up"></i> Realizar Predicción
-                        </a>
-                    </li>
-                </ul>
-            </div>
-            
-            <div class="col-lg-4">
-                <h6 class="fw-bold mb-3">Características</h6>
-                <ul class="list-unstyled">
-                    <li class="mb-2">
-                        <i class="bi bi-check-circle text-success"></i> Predicción en tiempo real
-                    </li>
-                    <li class="mb-2">
-                        <i class="bi bi-check-circle text-success"></i> Análisis con IA
-                    </li>
-                    <li class="mb-2">
-                        <i class="bi bi-check-circle text-success"></i> Gráficas detalladas
-                    </li>
-                    <li class="mb-2">
-                        <i class="bi bi-check-circle text-success"></i> Consejero virtual
-                    </li>
-                </ul>
-            </div>
         </div>
         
         <hr class="my-4">
         
         <div class="row align-items-center">
-            <div class="col-md-6 text-center text-md-start">
+            <div class="col-md-12 text-center mb-2">
                 <small class="text-muted">
                     &copy; {today.getFullYear()} Sistema de Predicción Académica. Todos los derechos reservados.
                 </small>
             </div>
-            <div class="col-md-6 text-center text-md-end">
+            <div class="col-md-12 text-center">
                 <small class="text-muted">
                     Desarrollado con <i class="bi bi-heart-fill text-danger"></i> usando Astro y FastAPI
                 </small>
@@ -84,12 +50,7 @@ const today = new Date();
         height: auto;
         display: block;
         margin: 0 auto;
-    }
-    
-    @media (min-width: 992px) {
-        .footer-logo {
-            margin: 0;
-        }
+        padding: 15px;
     }
     
     .footer-link {
