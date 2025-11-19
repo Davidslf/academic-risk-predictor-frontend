@@ -12,7 +12,7 @@ class PredictionService {
     private readonly timeout: number;
 
     constructor() {
-        this.baseUrl = API_CONFIG.BASE_URL;
+        this.baseUrl = API_CONFIG.BASE_URL; // http://0.0.0.0:8000
         this.timeout = API_CONFIG.TIMEOUT;
     }
 
@@ -45,14 +45,14 @@ class PredictionService {
             return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
-            
+
             if (error instanceof Error) {
                 if (error.name === 'AbortError') {
                     throw new Error('La petición tardó demasiado. El servidor puede estar "dormido" (plan gratuito). Espera 30 segundos e intenta de nuevo.');
                 }
                 throw new Error(`Error al conectar con el servidor: ${error.message}`);
             }
-            
+
             throw new Error('Error desconocido al realizar la predicción');
         }
     }
@@ -86,14 +86,14 @@ class PredictionService {
             return await response.json();
         } catch (error) {
             clearTimeout(timeoutId);
-            
+
             if (error instanceof Error) {
                 if (error.name === 'AbortError') {
                     throw new Error('La petición tardó demasiado. Intenta de nuevo.');
                 }
                 throw new Error(`Error al procesar tu pregunta: ${error.message}`);
             }
-            
+
             throw new Error('Error desconocido al enviar el mensaje');
         }
     }
