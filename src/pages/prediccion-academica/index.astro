@@ -681,11 +681,13 @@ import Footer from "../../components/Footer.astro";
             else if (nivel === 'MEDIO') color = '#f59e0b';
             else color = '#10b981';
             
+            const porcentajeRound = Math.round(porcentaje);
+            
             gaugeChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     datasets: [{
-                        data: [porcentaje, 100 - porcentaje],
+                        data: [porcentajeRound, 100 - porcentajeRound],
                         backgroundColor: [color, '#e5e7eb'],
                         borderWidth: 0
                     }]
@@ -707,27 +709,28 @@ import Footer from "../../components/Footer.astro";
                     }
                 },
                 plugins: [{
-                    id: 'textCenter',
-                    beforeDraw: (chart) => {
-                        const { width, height, ctx } = chart;
-                        ctx.restore();
-                        
-                        const centerX = width / 2;
-                        const centerY = height * 0.75;
-                        
-                        // Porcentaje
-                        ctx.font = `bold ${height / 4}px Arial`;
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillStyle = color;
-                        ctx.fillText(`${porcentaje}%`, centerX, centerY);
-                        
-                        // Texto
-                        ctx.font = `${height / 15}px Arial`;
-                        ctx.fillStyle = '#6b7280';
-                        ctx.fillText('de Riesgo', centerX, centerY + height / 8);
+                    id: 'gaugeText',
+                    afterDatasetsDraw: (chart) => {
+                        const { ctx, chartArea: { width, height } } = chart;
                         
                         ctx.save();
+                        
+                        const centerX = width / 2;
+                        const centerY = height * 0.9;
+                        
+                        // Porcentaje
+                        ctx.fillStyle = color;
+                        ctx.font = 'bold 48px Arial, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(porcentajeRound + '%', centerX, centerY - 25);
+                        
+                        // Texto "de Riesgo"
+                        ctx.fillStyle = '#6b7280';
+                        ctx.font = '16px Arial, sans-serif';
+                        ctx.fillText('de Riesgo', centerX, centerY + 10);
+                        
+                        ctx.restore();
                     }
                 }]
             });
