@@ -45,6 +45,7 @@ import Footer from '../../components/Footer.astro';
             body {
                 background: linear-gradient(135deg, #f6f8fb 0%, #e9ecef 100%);
                 min-height: 100vh;
+                padding-top: 70px; /* Espacio para el header fijo */
             }
 
             .form-card,
@@ -153,7 +154,7 @@ import Footer from '../../components/Footer.astro';
                 background: white;
                 border-radius: 20px;
                 box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-                z-index: 1000;
+                z-index: 900; /* Debajo del header (1000) */
                 display: none;
                 flex-direction: column;
                 overflow: hidden;
@@ -296,23 +297,6 @@ import Footer from '../../components/Footer.astro';
                 border-width: 0.3rem;
             }
 
-            /* Sticky behavior para desktop */
-            @media (min-width: 992px) {
-                .form-card.sticky-top {
-                    position: sticky;
-                    top: 20px;
-                    z-index: 100;
-                }
-            }
-
-            /* En móvil, desactivar sticky */
-            @media (max-width: 991px) {
-                .form-card.sticky-top {
-                    position: relative;
-                    top: auto !important;
-                }
-            }
-
             @media (max-width: 768px) {
                 .chatbot-container {
                     width: calc(100% - 40px);
@@ -342,7 +326,7 @@ import Footer from '../../components/Footer.astro';
             <div class="row">
                 <!-- Formulario -->
                 <div class="col-lg-5 mb-4">
-                    <div class="form-card sticky-top">
+                    <div class="form-card">
                         <h4 class="fw-bold mb-4">
                             <i class="bi bi-person-circle text-primary"></i>
                             Tus Datos Académicos
