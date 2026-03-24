@@ -4,7 +4,7 @@
  */
 
 export const API_CONFIG = {
-    BASE_URL: 'https://academic-risk-predictor-api.onrender.com',
+    BASE_URL: 'https://academic-risk-api-1763919371.azurewebsites.net',
     ENDPOINTS: {
         PREDICT: '/predict',
         CHAT: '/chat',
@@ -60,14 +60,14 @@ export const DOM_IDS = {
     PARCIAL: 'parcial',
     LOGINS: 'logins',
     TUTORIAS: 'tutorias',
-    
+
     // Value displays
     ASISTENCIA_VALUE: 'asistencia-value',
     SEGUIMIENTO_VALUE: 'seguimiento-value',
     PARCIAL_VALUE: 'parcial-value',
     LOGINS_VALUE: 'logins-value',
     TUTORIAS_LABEL: 'tutorias-label',
-    
+
     // Results
     LOADING: 'loading',
     INITIAL_MESSAGE: 'initial-message',
@@ -75,13 +75,13 @@ export const DOM_IDS = {
     RISK_BADGE: 'risk-badge',
     PROB_APROBAR: 'prob-aprobar',
     IA_ANALYSIS: 'ia-analysis',
-    
+
     // Charts
     GAUGE_CHART: 'gauge-chart',
     BAR_CHART: 'bar-chart',
     NOTES_CHART: 'notes-chart',
     ATTENDANCE_CHART: 'attendance-chart',
-    
+
     // Math modal
     SHOW_MATH_BTN: 'show-math-btn',
     FORMULA_LOGIT: 'formula-logit',
@@ -90,7 +90,7 @@ export const DOM_IDS = {
     INTERCEPTO_VALUE: 'intercepto-value',
     CALCULO_LOGIT: 'calculo-logit',
     CALCULO_PROBABILIDAD: 'calculo-probabilidad',
-    
+
     // Chat
     CHAT_TOGGLE: 'chat-toggle',
     CHAT_CLOSE: 'chat-close',
