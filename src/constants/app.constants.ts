@@ -6,8 +6,8 @@
 export const API_CONFIG = {
     BASE_URL: 'https://academic-risk-api-1763919371.azurewebsites.net',
     ENDPOINTS: {
-        PREDICT: '/predict',
-        CHAT: '/chat',
+        PREDICT: '/api/v1/predict',
+        CHAT: '/api/v1/chat',
     },
     TIMEOUT: 30000,
 } as const;
