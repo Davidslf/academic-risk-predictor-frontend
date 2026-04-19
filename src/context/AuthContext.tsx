@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import type { AuthUser, UserRole } from '../types'
-import { professors, students, DEMO_PASSWORD } from '../data/mockData'
+import { professors, students, adminUser, DEMO_PASSWORD } from '../data/mockData'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -33,6 +33,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const trimmed = username.trim().toLowerCase()
+
+    // Check admin
+    if (trimmed === adminUser.username) {
+      setUser({ id: adminUser.id, role: 'admin', name: adminUser.name, username: adminUser.username })
+      return { success: true }
+    }
 
     // Check professors first (by username slug)
     const prof = professors.find(p => p.username.toLowerCase() === trimmed)

@@ -1,11 +1,14 @@
 import { motion } from 'framer-motion'
 import { TrendingUp, Users, BookOpen } from 'lucide-react'
+import type { Step } from 'react-joyride'
 import type { Course, Grade } from '../types'
 import { students } from '../data/mockData'
 import { useGradeCalculation } from '../hooks/useGradeCalculation'
 import { useAuth } from '../context/AuthContext'
 import Header from '../components/Header'
 import SubjectCard from '../components/SubjectCard'
+import TourGuide from '../components/TourGuide'
+import { useTour } from '../hooks/useTour'
 
 interface Props {
   courses: Course[]
@@ -13,6 +16,27 @@ interface Props {
   onSelectCourse: (c: Course) => void
   onLogout: () => void
 }
+
+const TOUR_STEPS: Step[] = [
+  {
+    target:         '#tour-prof-nav',
+    title:          '🧭 Navegación del docente',
+    content:        'Accede al Dashboard con el resumen de tus cursos, o al portal de Calificaciones para gestionar las notas de cada estudiante.',
+    placement:      'bottom',
+  },
+  {
+    target:         '#tour-stats',
+    title:          '📈 Resumen del período',
+    content:        'Aquí ves de un vistazo cuántas materias tienes asignadas, el total de estudiantes y el corte académico activo.',
+    placement:      'bottom',
+  },
+  {
+    target:         '#tour-courses',
+    title:          '📚 Tus materias',
+    content:        'Haz clic en cualquier materia para abrir el portal de calificaciones, donde podrás ingresar notas y ver el indicador de riesgo de cada estudiante.',
+    placement:      'top',
+  },
+]
 
 function CourseRow({ course, grades, onClick, index }: {
   course: Course; grades: Grade[]; onClick: () => void; index: number
@@ -32,11 +56,13 @@ function CourseRow({ course, grades, onClick, index }: {
 
 export default function Dashboard({ courses, grades, onSelectCourse }: Props) {
   const { user } = useAuth()
+  const { run, onTourEnd } = useTour('professor-dashboard')
   const totalStudents = new Set(courses.flatMap(c => c.studentIds)).size
   const firstName = user?.name.split(' ').slice(-2)[0] ?? ''
 
   return (
     <div className="min-h-screen bg-usb-canvas flex flex-col">
+      <TourGuide run={run} steps={TOUR_STEPS} onEnd={onTourEnd} />
       <Header />
 
       {/* Period ribbon */}
@@ -74,7 +100,7 @@ export default function Dashboard({ courses, grades, onSelectCourse }: Props) {
         </motion.div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div id="tour-stats" className="grid grid-cols-3 gap-4 mb-8">
           {[
             { icon: BookOpen,   label: 'Materias',     value: courses.length,       color: 'text-ar-cyan',   bg: 'bg-ar-cyan/10' },
             { icon: Users,      label: 'Estudiantes',  value: totalStudents,        color: 'text-violet-500', bg: 'bg-violet-50' },
@@ -103,7 +129,7 @@ export default function Dashboard({ courses, grades, onSelectCourse }: Props) {
           <h3 className="text-xs font-bold uppercase tracking-wider text-usb-muted">Materias asignadas</h3>
           <span className="text-xs text-usb-faint">{courses.length} curso{courses.length !== 1 ? 's' : ''}</span>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div id="tour-courses" className="grid gap-3 sm:grid-cols-2">
           {courses.map((course, i) => (
             <CourseRow
               key={course.id}

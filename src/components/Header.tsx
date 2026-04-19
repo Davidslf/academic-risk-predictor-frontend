@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { LogOut, Cloud, Loader2, BarChart2, BookOpen, LayoutDashboard, ClipboardList } from 'lucide-react'
+import { LogOut, Cloud, Loader2, BarChart2, BookOpen, LayoutDashboard, ClipboardList, HelpCircle } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 interface Props {
@@ -46,7 +46,7 @@ export default function Header({ lastSaved, subtitle }: Props) {
 
           {/* Nav links */}
           {isStudent && (
-            <nav className="hidden md:flex items-center gap-1 ml-2">
+            <nav id="tour-nav" className="hidden md:flex items-center gap-1 ml-2">
               <Link
                 to="/"
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
@@ -84,7 +84,7 @@ export default function Header({ lastSaved, subtitle }: Props) {
           )}
 
           {isProfessor && (
-            <nav className="hidden md:flex items-center gap-1 ml-2">
+            <nav id="tour-prof-nav" className="hidden md:flex items-center gap-1 ml-2">
               <Link
                 to="/dashboard"
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
@@ -129,6 +129,15 @@ export default function Header({ lastSaved, subtitle }: Props) {
               )}
             </div>
           )}
+
+          {/* Tour help button */}
+          <button
+            onClick={() => window.dispatchEvent(new Event('ar:start-tour'))}
+            className="p-1.5 text-white/30 hover:text-ar-cyan hover:bg-white/10 rounded-lg transition-colors"
+            title="Repetir tour de bienvenida"
+          >
+            <HelpCircle size={15} />
+          </button>
 
           {/* Divider */}
           <div className="w-px h-5 bg-white/10" />

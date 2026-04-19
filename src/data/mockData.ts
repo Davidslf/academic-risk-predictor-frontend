@@ -1,7 +1,72 @@
-import type { Professor, Student, Course, Grade } from '../types'
+import type { Professor, Student, Course, Grade, University, Program } from '../types'
 
 // Demo password for all users in demonstration mode
 export const DEMO_PASSWORD = 'demo'
+
+// ─── Admin credentials ───────────────────────────────────────────────────────
+export const adminUser = {
+  id:       'admin-1',
+  username: 'admin',
+  name:     'Administrador',
+  role:     'admin' as const,
+}
+
+// ─── Universities (mocked) ───────────────────────────────────────────────────
+export const initialUniversities: University[] = [
+  {
+    id:           'uni-1',
+    name:         'Universidad Nacional de Colombia',
+    logo:         '',
+    createdAt:    '2024-01-15',
+    programCount: 8,
+    status:       'active',
+  },
+  {
+    id:           'uni-2',
+    name:         'Universidad de Antioquia',
+    logo:         '',
+    createdAt:    '2024-02-03',
+    programCount: 8,
+    status:       'active',
+  },
+  {
+    id:           'uni-3',
+    name:         'Universidad EAFIT',
+    logo:         '',
+    createdAt:    '2024-02-20',
+    programCount: 6,
+    status:       'active',
+  },
+]
+
+// ─── Programs (mocked) ───────────────────────────────────────────────────────
+export const initialPrograms: Program[] = [
+  // Universidad Nacional de Colombia
+  { id: 'prog-1', universityId: 'uni-1', name: 'Ingeniería de Sistemas y Computación', level: 'Pregrado',      faculty: 'Ingeniería',              credits: 165, duration: '10 semestres' },
+  { id: 'prog-2', universityId: 'uni-1', name: 'Ingeniería Civil',                     level: 'Pregrado',      faculty: 'Ingeniería',              credits: 172, duration: '10 semestres' },
+  { id: 'prog-3', universityId: 'uni-1', name: 'Medicina',                             level: 'Pregrado',      faculty: 'Medicina',                credits: 240, duration: '12 semestres' },
+  { id: 'prog-4', universityId: 'uni-1', name: 'Derecho',                              level: 'Pregrado',      faculty: 'Derecho, Ciencias Políticas y Sociales', credits: 162, duration: '10 semestres' },
+  { id: 'prog-5', universityId: 'uni-1', name: 'Economía',                             level: 'Pregrado',      faculty: 'Ciencias Económicas',     credits: 150, duration: '10 semestres' },
+  { id: 'prog-6', universityId: 'uni-1', name: 'Psicología',                           level: 'Pregrado',      faculty: 'Ciencias Humanas',        credits: 160, duration: '10 semestres' },
+  { id: 'prog-7', universityId: 'uni-1', name: 'Maestría en Ingeniería — Sistemas',    level: 'Posgrado',      faculty: 'Ingeniería',              credits: 52,  duration: '4 semestres'  },
+  { id: 'prog-8', universityId: 'uni-1', name: 'Doctorado en Ciencias — Informática',  level: 'Posgrado',      faculty: 'Ingeniería',              credits: 80,  duration: '8 semestres'  },
+  // Universidad de Antioquia
+  { id: 'prog-9',  universityId: 'uni-2', name: 'Administración de Empresas',          level: 'Pregrado',      faculty: 'Ciencias Económicas',     credits: 155, duration: '10 semestres' },
+  { id: 'prog-10', universityId: 'uni-2', name: 'Ingeniería Electrónica',              level: 'Pregrado',      faculty: 'Ingeniería',              credits: 168, duration: '10 semestres' },
+  { id: 'prog-11', universityId: 'uni-2', name: 'Enfermería',                          level: 'Pregrado',      faculty: 'Enfermería',              credits: 175, duration: '10 semestres' },
+  { id: 'prog-12', universityId: 'uni-2', name: 'Comunicaciones',                      level: 'Pregrado',      faculty: 'Comunicaciones',          credits: 148, duration: '10 semestres' },
+  { id: 'prog-13', universityId: 'uni-2', name: 'Técnico Auxiliar Contable',           level: 'Técnico',       faculty: 'Ciencias Económicas',     credits: 48,  duration: '2 semestres'  },
+  { id: 'prog-14', universityId: 'uni-2', name: 'Tecnología en Sistemas de Inf.',      level: 'Tecnológico',   faculty: 'Ingeniería',              credits: 90,  duration: '6 semestres'  },
+  { id: 'prog-15', universityId: 'uni-2', name: 'Especialización en Gerencia',         level: 'Posgrado',      faculty: 'Ciencias Económicas',     credits: 36,  duration: '2 semestres'  },
+  { id: 'prog-16', universityId: 'uni-2', name: 'Filosofía',                           level: 'Pregrado',      faculty: 'Artes y Humanidades',     credits: 152, duration: '10 semestres' },
+  // Universidad EAFIT
+  { id: 'prog-17', universityId: 'uni-3', name: 'Ingeniería de Producción',            level: 'Pregrado',      faculty: 'Ingeniería',              credits: 160, duration: '10 semestres' },
+  { id: 'prog-18', universityId: 'uni-3', name: 'Ingeniería de Sistemas',              level: 'Pregrado',      faculty: 'Ingeniería',              credits: 158, duration: '10 semestres' },
+  { id: 'prog-19', universityId: 'uni-3', name: 'Administración de Negocios',          level: 'Pregrado',      faculty: 'Escuela de Negocios',     credits: 150, duration: '10 semestres' },
+  { id: 'prog-20', universityId: 'uni-3', name: 'Geología',                            level: 'Pregrado',      faculty: 'Ciencias',                credits: 162, duration: '10 semestres' },
+  { id: 'prog-21', universityId: 'uni-3', name: 'Maestría en Administración',          level: 'Posgrado',      faculty: 'Escuela de Negocios',     credits: 60,  duration: '4 semestres'  },
+  { id: 'prog-22', universityId: 'uni-3', name: 'Música',                              level: 'Pregrado',      faculty: 'Humanidades',             credits: 144, duration: '10 semestres' },
+]
 
 export const professors: Professor[] = [
   {
