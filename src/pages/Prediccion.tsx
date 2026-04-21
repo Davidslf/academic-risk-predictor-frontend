@@ -16,11 +16,9 @@ import { useAuth } from '../context/AuthContext'
 import { useGrades } from '../context/GradesContext'
 import { gradeColor } from '../utils/gradeCalculator'
 import type { Course } from '../types'
+import { predictionService } from '../services/predictionService'
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend)
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-const API_BASE = 'https://academic-risk-api-1763919371.azurewebsites.net'
 
 const PROMEDIOS_APROBADOS = {
   asistencia:  88.5,
@@ -39,6 +37,7 @@ interface FormData {
 }
 
 interface PredictionResult {
+  probabilidad_riesgo?: number
   porcentaje_riesgo: number
   nivel_riesgo: 'BAJO' | 'MEDIO' | 'ALTO'
   analisis_ia: string
@@ -48,13 +47,14 @@ interface PredictionResult {
     promedio_aprobado: number[]
   }
   detalles_matematicos: {
-    intercepto: number
-    coeficientes: number[]
-    features_scaled: number[]
+    intercepto?: number
+    coeficientes: number[] | Array<{ variable: string; coeficiente: number; valor: number; contribucion: number }>
+    features_scaled?: number[]
     formula_logit: string
-    formula_sigmoide: string
-    calculo_logit_texto: string
-    calculo_probabilidad_texto: string
+    formula_sigmoide?: string
+    calculo_logit_texto?: string
+    calculo_probabilidad_texto?: string
+    valor_z?: number
   }
 }
 
@@ -296,28 +296,19 @@ function ChatBot({ result, formData }: { result: PredictionResult | null; formDa
     setLoading(true)
 
     try {
-      const ctrl = new AbortController()
-      const timer = setTimeout(() => ctrl.abort(), 30000)
-      const res = await fetch(`${API_BASE}/api/v1/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: ctrl.signal,
-        body: JSON.stringify({
-          pregunta: text,
-          datos_estudiante: {
-            promedio_asistencia:       formData.asistencia,
-            promedio_seguimiento:      formData.seguimiento,
-            nota_parcial_1:            formData.parcial,
-            inicios_sesion_plataforma: formData.logins,
-            uso_tutorias:              formData.tutorias ? 1 : 0,
-          },
-          prediccion_actual: result,
-        }),
+      const data = await predictionService.chat({
+        message: text,
+        context: {
+          promedio_asistencia:       formData.asistencia,
+          promedio_seguimiento:      formData.seguimiento,
+          nota_parcial_1:            formData.parcial,
+          inicios_sesion_plataforma: formData.logins,
+          uso_tutorias:              formData.tutorias ? 1 : 0,
+          nivel_riesgo:              result?.nivel_riesgo,
+          probabilidad_riesgo:       result?.probabilidad_riesgo,
+        },
       })
-      clearTimeout(timer)
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-      setMessages(prev => [...prev, { role: 'bot', text: data.respuesta }])
+      setMessages(prev => [...prev, { role: 'bot', text: data.response }])
     } catch {
       setMessages(prev => [...prev, { role: 'bot', text: 'Lo siento, no pude conectarme al servidor. Intenta de nuevo más tarde.' }])
     } finally {
@@ -460,6 +451,28 @@ function MarkdownText({ text }: { text: string }) {
 function MathModal({ result, onClose }: { result: PredictionResult; onClose: () => void }) {
   const d = result.detalles_matematicos
   const featureNames = ['Asistencia', 'Seguimiento', 'Parcial 1', 'Inicios Sesión', 'Tutorías']
+
+  // Support both backend formats:
+  // Old: coeficientes = number[], features_scaled = number[]
+  // New: coeficientes = { variable, coeficiente, valor, contribucion }[]
+  type NewCoef = { variable: string; coeficiente: number; valor: number; contribucion: number }
+  const isNewFormat = d.coeficientes.length > 0 && typeof d.coeficientes[0] === 'object'
+
+  const rows = featureNames.map((name, i) => {
+    if (isNewFormat) {
+      const coef = d.coeficientes[i] as NewCoef | undefined
+      return {
+        name:    coef?.variable ?? name,
+        scaled:  coef?.valor ?? 0,
+        coef:    coef?.coeficiente ?? 0,
+        impact:  coef?.contribucion ?? 0,
+      }
+    }
+    const scaled  = (d.features_scaled ?? [])[i] ?? 0
+    const coefNum = d.coeficientes[i] as number ?? 0
+    return { name, scaled, coef: coefNum, impact: scaled * coefNum }
+  })
+
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -490,30 +503,32 @@ function MathModal({ result, onClose }: { result: PredictionResult; onClose: () 
                 </tr>
               </thead>
               <tbody>
-                {featureNames.map((name, i) => {
-                  const impact = (d.features_scaled[i] ?? 0) * (d.coeficientes[i] ?? 0)
-                  return (
-                    <tr key={name} className="border-b border-usb-border">
-                      <td className="px-3 py-2 font-medium text-usb-subtle">{name}</td>
-                      <td className="px-3 py-2 text-center font-mono text-usb-muted">{(d.features_scaled[i] ?? 0).toFixed(4)}</td>
-                      <td className="px-3 py-2 text-center font-mono text-ar-cyan font-semibold">{(d.coeficientes[i] ?? 0).toFixed(4)}</td>
-                      <td className={`px-3 py-2 text-center font-mono font-bold ${impact < 0 ? 'text-emerald-600' : 'text-red-500'}`}>{impact.toFixed(4)}</td>
-                    </tr>
-                  )
-                })}
+                {rows.map(({ name, scaled, coef, impact }) => (
+                  <tr key={name} className="border-b border-usb-border">
+                    <td className="px-3 py-2 font-medium text-usb-subtle">{name}</td>
+                    <td className="px-3 py-2 text-center font-mono text-usb-muted">{scaled.toFixed(4)}</td>
+                    <td className="px-3 py-2 text-center font-mono text-ar-cyan font-semibold">{coef.toFixed(4)}</td>
+                    <td className={`px-3 py-2 text-center font-mono font-bold ${impact < 0 ? 'text-emerald-600' : 'text-red-500'}`}>{impact.toFixed(4)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
           {[
-            { label: 'Intercepto', val: d.intercepto.toFixed(6) },
-            { label: 'Cálculo z (logit)', val: d.calculo_logit_texto },
-            { label: 'Probabilidad σ(z)', val: d.calculo_probabilidad_texto },
-          ].map(({ label, val }) => (
-            <div key={label} className="bg-usb-canvas rounded-xl p-4 border border-usb-border">
-              <p className="text-xs font-bold uppercase tracking-wider text-usb-muted mb-2">{label}</p>
-              <p className="font-mono text-xs text-usb-subtle leading-relaxed break-all">{val}</p>
-            </div>
-          ))}
+            d.intercepto != null && { label: 'Intercepto', val: d.intercepto.toFixed(6) },
+            d.valor_z    != null && { label: 'Valor z (logit)', val: d.valor_z.toFixed(6) },
+            d.formula_logit      && { label: 'Fórmula logit', val: d.formula_logit },
+            d.calculo_logit_texto      && { label: 'Cálculo z (logit)', val: d.calculo_logit_texto },
+            d.calculo_probabilidad_texto && { label: 'Probabilidad σ(z)', val: d.calculo_probabilidad_texto },
+          ].filter(Boolean).map(item => {
+            const { label, val } = item as { label: string; val: string }
+            return (
+              <div key={label} className="bg-usb-canvas rounded-xl p-4 border border-usb-border">
+                <p className="text-xs font-bold uppercase tracking-wider text-usb-muted mb-2">{label}</p>
+                <p className="font-mono text-xs text-usb-subtle leading-relaxed break-all">{val}</p>
+              </div>
+            )
+          })}
         </div>
       </motion.div>
     </motion.div>
@@ -567,32 +582,21 @@ export default function Prediccion() {
     setLoading(true)
     setError('')
 
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 30000)
-
     try {
-      const res = await fetch(`${API_BASE}/api/v1/predict`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: ctrl.signal,
-        body: JSON.stringify({
-          promedio_asistencia:        finalForm.asistencia,
-          promedio_seguimiento:       finalForm.seguimiento,
-          nota_parcial_1:             finalForm.parcial,
-          inicios_sesion_plataforma:  finalForm.logins,
-          uso_tutorias:               finalForm.tutorias ? 1 : 0,
-        }),
-      })
-      clearTimeout(timer)
-      if (!res.ok) throw new Error(`Error ${res.status}`)
-      const data: PredictionResult = await res.json()
-      setResult(data)
+      const data = await predictionService.predict({
+        promedio_asistencia:        finalForm.asistencia,
+        promedio_seguimiento:       finalForm.seguimiento,
+        nota_parcial_1:             finalForm.parcial,
+        inicios_sesion_plataforma:  finalForm.logins,
+        uso_tutorias:               finalForm.tutorias ? 1 : 0,
+      }, user?.studentId)
+      setResult(data as unknown as PredictionResult)
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         setError('La petición tardó demasiado. El servidor puede estar iniciando (30–50 s). Intenta de nuevo.')
       } else {
-        setError('No se pudo conectar con el servidor. Verifica tu conexión.')
+        setError('No se pudo conectar con el servidor. Verifica tu conexión o que el backend esté corriendo.')
       }
     } finally {
       setLoading(false)

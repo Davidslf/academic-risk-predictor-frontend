@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { Course } from './types'
@@ -27,9 +27,16 @@ function RequireRole({ role, children }: { role: AllowedRole; children: React.Re
 // ─── Professor portal ────────────────────────────────────────────────────────
 function ProfessorPortal() {
   const { user, logout } = useAuth()
-  const { courseList, grades, lastSaved, updateGrade, updateComponents } = useGrades()
+  const { courseList, grades, lastSaved, updateGrade, updateComponents, refreshCourses } = useGrades()
   const navigate = useNavigate()
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
+
+  // Load professor's real courses from the backend on mount
+  useEffect(() => {
+    if (user?.professorId) {
+      void refreshCourses(user.professorId)
+    }
+  }, [user?.professorId, refreshCourses])
 
   const myCourses = courseList.filter(c => c.professorId === user?.professorId)
 

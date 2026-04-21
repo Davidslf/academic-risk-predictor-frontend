@@ -363,7 +363,7 @@ export default function LoginPage() {
     playWelcomeVoice(validated.name)
 
     // Actually set auth state after the overlay animation plays (~2.4 s)
-    setTimeout(() => login(username, password), 2400)
+    setTimeout(() => void login(username, password), 2400)
   }
 
   return (
