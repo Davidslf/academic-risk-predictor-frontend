@@ -26,104 +26,96 @@ export default function Header({ lastSaved, subtitle }: Props) {
   const isProfessor = user?.role === 'professor'
 
   return (
-    <header className="bg-ar-navy border-b border-white/10 sticky top-0 z-40 shadow-lg">
-      <div className="flex items-center justify-between px-5 py-3 max-w-7xl mx-auto">
+    /* DESIGN.md §4 Nav — House Green bg, 3-layer shadow, sticky */
+    <header className="bg-sbucks-house sticky top-0 z-40 shadow-nav">
+      <div className="flex items-center justify-between px-6 py-3 max-w-7xl mx-auto" style={{ minHeight: '64px' }}>
         {/* Left: brand */}
         <div className="flex items-center gap-4">
           <Link to={isStudent ? '/' : '/dashboard'} className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg bg-ar-cyan/20 border border-ar-cyan/30 flex items-center justify-center">
-              <BarChart2 size={16} className="text-ar-cyan" />
+            {/* Brand icon pill — sbucks-accent/20 */}
+            <div className="w-8 h-8 rounded-lg bg-sbucks-accent/30 border border-sbucks-accent/40 flex items-center justify-center">
+              <BarChart2 size={16} className="text-sbucks-light" />
             </div>
             <div>
-              <span className="text-white font-extrabold text-sm tracking-tight group-hover:text-ar-cyan transition-colors">
+              <span
+                className="text-white font-extrabold text-sm group-hover:text-sbucks-light transition-colors"
+                style={{ letterSpacing: '-0.016em' }}
+              >
                 Academic Risk
               </span>
               {subtitle && (
-                <p className="text-white/40 text-[0.65rem] leading-tight">{subtitle}</p>
+                <p className="text-white/40 text-[0.62rem] leading-tight">{subtitle}</p>
               )}
             </div>
           </Link>
 
-          {/* Nav links */}
+          {/* Nav links — students */}
           {isStudent && (
-            <nav className="hidden md:flex items-center gap-1 ml-2">
-              <Link
-                to="/"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  location.pathname === '/'
-                    ? 'bg-ar-cyan/20 text-ar-cyan'
-                    : 'text-white/50 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <BookOpen size={13} />
-                Inicio
-              </Link>
-              <Link
-                to="/mis-notas"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  location.pathname === '/mis-notas'
-                    ? 'bg-ar-cyan/20 text-ar-cyan'
-                    : 'text-white/50 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <ClipboardList size={13} />
-                Mis Notas
-              </Link>
-              <Link
-                to="/prediccion"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  location.pathname === '/prediccion'
-                    ? 'bg-ar-cyan/20 text-ar-cyan'
-                    : 'text-white/50 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <BarChart2 size={13} />
-                Predicción
-              </Link>
+            <nav className="hidden md:flex items-center gap-0.5 ml-3">
+              {[
+                { to: '/',           icon: BookOpen,      label: 'Inicio' },
+                { to: '/mis-notas',  icon: ClipboardList, label: 'Mis Notas' },
+                { to: '/prediccion', icon: BarChart2,      label: 'Predicción' },
+              ].map(({ to, icon: Icon, label }) => {
+                const active = location.pathname === to
+                return (
+                  <Link
+                    key={to}
+                    to={to}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      active
+                        ? 'bg-sbucks-accent/25 text-sbucks-light'
+                        : 'text-white/50 hover:text-white hover:bg-white/8'
+                    }`}
+                  >
+                    <Icon size={13} />
+                    {label}
+                  </Link>
+                )
+              })}
             </nav>
           )}
 
+          {/* Nav links — professors */}
           {isProfessor && (
-            <nav className="hidden md:flex items-center gap-1 ml-2">
-              <Link
-                to="/dashboard"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  location.pathname === '/dashboard'
-                    ? 'bg-ar-cyan/20 text-ar-cyan'
-                    : 'text-white/50 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <LayoutDashboard size={13} />
-                Dashboard
-              </Link>
-              <Link
-                to="/grades"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  location.pathname === '/grades'
-                    ? 'bg-ar-cyan/20 text-ar-cyan'
-                    : 'text-white/50 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <BookOpen size={13} />
-                Calificaciones
-              </Link>
+            <nav className="hidden md:flex items-center gap-0.5 ml-3">
+              {[
+                { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+                { to: '/grades',    icon: BookOpen,        label: 'Calificaciones' },
+              ].map(({ to, icon: Icon, label }) => {
+                const active = location.pathname === to
+                return (
+                  <Link
+                    key={to}
+                    to={to}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      active
+                        ? 'bg-sbucks-accent/25 text-sbucks-light'
+                        : 'text-white/50 hover:text-white hover:bg-white/8'
+                    }`}
+                  >
+                    <Icon size={13} />
+                    {label}
+                  </Link>
+                )
+              })}
             </nav>
           )}
         </div>
 
         {/* Right: autosave + user */}
         <div className="flex items-center gap-3">
-          {/* Autosave indicator (professors only) */}
+          {/* Autosave indicator — professors only */}
           {isProfessor && lastSaved !== undefined && (
-            <div className="hidden sm:flex items-center gap-1.5 text-white/40 text-xs bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
+            <div className="hidden sm:flex items-center gap-1.5 text-white/40 text-xs bg-white/6 px-3 py-1.5 rounded-pill border border-white/10">
               {timeStr ? (
                 <>
-                  <Cloud size={11} className="text-ar-cyan" />
+                  <Cloud size={11} className="text-sbucks-light" />
                   <span className="font-medium">Guardado · {timeStr}</span>
                 </>
               ) : (
                 <>
-                  <Loader2 size={11} className="animate-spin text-ar-cyan" />
+                  <Loader2 size={11} className="animate-spin text-sbucks-light" />
                   <span className="font-medium">Guardando…</span>
                 </>
               )}
@@ -131,16 +123,20 @@ export default function Header({ lastSaved, subtitle }: Props) {
           )}
 
           {/* Divider */}
-          <div className="w-px h-5 bg-white/10" />
+          <div className="w-px h-5 bg-white/15" />
 
-          {/* User */}
+          {/* User avatar + name */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-ar-cyan/20 border border-ar-cyan/30 flex items-center justify-center text-ar-cyan font-extrabold text-xs">
+            <div className="w-8 h-8 rounded-full bg-sbucks-accent/30 border border-sbucks-accent/40 flex items-center justify-center text-sbucks-light font-extrabold text-xs">
               {initials}
             </div>
             <div className="hidden sm:block">
-              <p className="text-white text-[0.78rem] font-bold leading-tight">{user?.name}</p>
-              <p className="text-white/40 text-[0.65rem] capitalize">{user?.role === 'student' ? 'Estudiante' : 'Docente'}</p>
+              <p className="text-white text-[0.78rem] font-bold leading-tight" style={{ letterSpacing: '-0.01em' }}>
+                {user?.name}
+              </p>
+              <p className="text-white/40 text-[0.62rem] capitalize">
+                {user?.role === 'student' ? 'Estudiante' : 'Docente'}
+              </p>
             </div>
             <button
               onClick={handleLogout}

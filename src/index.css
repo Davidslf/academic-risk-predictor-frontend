@@ -4,8 +4,20 @@
 
 @layer base {
   body {
-    @apply bg-usb-canvas text-usb-text font-sans antialiased;
+    /* DESIGN.md §5 — canvas-warm (#f2f0eb) as primary page background */
+    background-color: #f2f0eb;
+    color: #1a1a1a;
+    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* DESIGN.md §3 — universal tight tracking (SoDoSans equivalent) */
+    letter-spacing: -0.01em;
     font-feature-settings: "kern" 1, "liga" 1;
+  }
+
+  /* DESIGN.md §3 — display headings use tighter tracking */
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.016em;
   }
 
   table {
@@ -24,16 +36,139 @@
 }
 
 @layer components {
+  /* ── Buttons (DESIGN.md §4 — 50px full-pill radius, scale(0.95) active) ── */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background-color: #00754A;
+    color: #ffffff;
+    font-weight: 600;
+    padding: 7px 1rem;
+    border-radius: 50px;
+    border: 1px solid #00754A;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  .btn-primary:hover { background-color: #006241; border-color: #006241; }
+  .btn-primary:active { transform: scale(0.95); }
+
+  .btn-outlined {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: transparent;
+    color: #00754A;
+    font-weight: 600;
+    padding: 7px 1rem;
+    border-radius: 50px;
+    border: 1px solid #00754A;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  .btn-outlined:active { transform: scale(0.95); }
+
+  .btn-dark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background-color: #000000;
+    color: #ffffff;
+    font-weight: 600;
+    padding: 7px 1rem;
+    border-radius: 50px;
+    border: 1px solid #000000;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  .btn-dark:active { transform: scale(0.95); }
+
+  /* DESIGN.md §4 Green-on-Green Inverted: white bg, sbucks-accent text — for dark band CTAs */
+  .btn-inverted {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background-color: #ffffff;
+    color: #00754A;
+    font-weight: 600;
+    padding: 7px 1rem;
+    border-radius: 50px;
+    border: 1px solid #ffffff;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  .btn-inverted:hover { background-color: #f2f0eb; border-color: #f2f0eb; }
+  .btn-inverted:active { transform: scale(0.95); }
+
+  /* DESIGN.md §4 Outlined on Dark: transparent bg, white border — secondary on dark bands */
+  .btn-outlined-light {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: transparent;
+    color: #ffffff;
+    font-weight: 600;
+    padding: 7px 1rem;
+    border-radius: 50px;
+    border: 1px solid #ffffff;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  .btn-outlined-light:hover { background-color: rgba(255,255,255,0.10); }
+  .btn-outlined-light:active { transform: scale(0.95); }
+
+  /* ── Cards (DESIGN.md §4 — 12px radius, 2-layer whisper shadow) ─── */
+  .content-card {
+    @apply bg-white rounded-card shadow-card border border-usb-border;
+  }
+
+  /* ── Feature band (DESIGN.md §4 — House Green bands) ────────────── */
+  .feature-band {
+    background-color: #1E3932;
+    color: #ffffff;
+    width: 100%;
+  }
+
+  /* ── Section label (DESIGN.md §3 — uppercase + 0.1em tracking) ──── */
+  .section-label {
+    color: #00754A;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Existing functional classes ─────────────────────────────────── */
   .grade-cell {
     @apply font-mono text-[0.8rem] font-medium;
     font-variant-numeric: tabular-nums;
   }
 
   .pill-badge {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-pill text-xs font-semibold;
   }
 
   .input-grade {
-    @apply w-14 text-center font-mono text-[0.8rem] font-medium border border-usb-border rounded-lg bg-white py-1 px-1 focus:outline-none focus:border-ar-cyan focus:ring-2 focus:ring-ar-cyan/20 transition-all;
+    @apply w-14 text-center font-mono text-[0.8rem] font-medium border border-usb-border rounded-lg bg-white py-1 px-1
+           focus:outline-none transition-all;
+  }
+  .input-grade:focus {
+    border-color: #00754A;
+    box-shadow: 0 0 0 2px rgba(0, 117, 74, 0.20);
   }
 }

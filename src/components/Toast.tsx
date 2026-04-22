@@ -35,11 +35,12 @@ const icons = {
   info:    Info,
 }
 
+/* DESIGN.md §4 — success & info use sbucks-accent green; error uses semantic red; warning uses amber */
 const styles = {
-  success: { bar: 'bg-green-500',  icon: 'text-green-500',  bg: 'bg-white' },
-  error:   { bar: 'bg-red-500',    icon: 'text-red-500',    bg: 'bg-white' },
-  warning: { bar: 'bg-amber-400',  icon: 'text-amber-500',  bg: 'bg-white' },
-  info:    { bar: 'bg-usb-orange', icon: 'text-usb-orange', bg: 'bg-white' },
+  success: { bar: 'bg-sbucks-accent', icon: 'text-sbucks-accent', bg: 'bg-white' },
+  error:   { bar: 'bg-red-500',       icon: 'text-red-500',       bg: 'bg-white' },
+  warning: { bar: 'bg-amber-400',     icon: 'text-amber-500',     bg: 'bg-white' },
+  info:    { bar: 'bg-sbucks-green',  icon: 'text-sbucks-green',  bg: 'bg-white' },
 }
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
@@ -57,21 +58,22 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 80, scale: 0.95 }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-      className={`relative flex items-start gap-3 w-80 ${s.bg} rounded-2xl shadow-modal border border-usb-border overflow-hidden pr-4 pl-4 py-3.5`}
+      /* DESIGN.md §6 — 2-layer modal shadow */
+      className={`relative flex items-start gap-3 w-80 ${s.bg} rounded-card shadow-modal border border-usb-border overflow-hidden pr-4 pl-4 py-3.5`}
     >
       {/* Left color bar */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${s.bar} rounded-l-2xl`} />
+      <div className={`absolute left-0 top-0 bottom-0 w-1 ${s.bar} rounded-l-card`} />
 
       <Icon size={18} className={`${s.icon} flex-shrink-0 mt-0.5 ml-1`} />
       <div className="flex-1 min-w-0">
-        <p className="font-bold text-sm text-usb-text">{toast.title}</p>
+        <p className="font-bold text-sm text-ink" style={{ letterSpacing: '-0.01em' }}>{toast.title}</p>
         {toast.message && (
-          <p className="text-xs text-usb-muted mt-0.5 leading-relaxed">{toast.message}</p>
+          <p className="text-xs text-ink-soft mt-0.5 leading-relaxed">{toast.message}</p>
         )}
       </div>
       <button
         onClick={() => onRemove(toast.id)}
-        className="text-usb-faint hover:text-usb-muted transition-colors flex-shrink-0 mt-0.5"
+        className="text-ink-faint hover:text-ink-soft transition-colors flex-shrink-0 mt-0.5"
       >
         <X size={14} />
       </button>

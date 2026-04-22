@@ -21,7 +21,6 @@ export default function LoginPage() {
     }
     setLoading(true)
     setError('')
-    // small delay for UX
     await new Promise(r => setTimeout(r, 400))
     const result = login(username, password)
     if (!result.success) {
@@ -31,13 +30,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-ar-gradient flex flex-col overflow-hidden relative">
-      {/* Background decorations */}
+    // DESIGN.md §7 — page canvas is House Green on the login surface (dark full-page)
+    <div className="min-h-screen bg-sbucks-house flex flex-col overflow-hidden relative">
+      {/* Background decorations — subtle glow blobs, no gradients */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-ar-cyan/10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-ar-cyan/5 blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-sbucks-accent/10 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-sbucks-accent/6 blur-3xl" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-white/5" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full border border-white/3" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full border border-white/[0.025]" />
       </div>
 
       <div className="flex-1 flex items-center justify-center px-4 py-12 relative z-10">
@@ -47,24 +47,33 @@ export default function LoginPage() {
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           className="w-full max-w-md"
         >
-          {/* Brand */}
+          {/* Brand mark */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-ar-cyan/20 border border-ar-cyan/30 mb-4">
-              <GraduationCap size={32} className="text-ar-cyan" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-sbucks-accent/25 border border-sbucks-accent/35 mb-4">
+              <GraduationCap size={32} className="text-sbucks-light" />
             </div>
-            <h1 className="text-white text-3xl font-extrabold tracking-tight">Academic Risk</h1>
-            <p className="text-white/50 text-sm mt-1">Plataforma Académica Inteligente</p>
+            <h1 className="text-white text-3xl font-extrabold" style={{ letterSpacing: '-0.016em' }}>
+              Academic Risk
+            </h1>
+            <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.50)', letterSpacing: '-0.01em' }}>
+              Plataforma Académica Inteligente
+            </p>
           </div>
 
-          {/* Form card */}
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-8 shadow-modal">
-            <h2 className="text-white text-xl font-bold mb-1">Iniciar sesión</h2>
-            <p className="text-white/50 text-sm mb-6">Ingresa con tu código estudiantil o usuario docente</p>
+          {/* Form card — glassmorphism on the dark-green surface */}
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-card p-8 shadow-modal">
+            <h2 className="text-white text-xl font-bold mb-1" style={{ letterSpacing: '-0.016em' }}>
+              Iniciar sesión
+            </h2>
+            <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.50)', letterSpacing: '-0.01em' }}>
+              Ingresa con tu código estudiantil o usuario docente
+            </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Username */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-white/60 mb-2">
+                <label className="block text-xs font-bold text-white/60 mb-2 uppercase"
+                       style={{ letterSpacing: '0.1em' }}>
                   Usuario
                 </label>
                 <input
@@ -72,7 +81,9 @@ export default function LoginPage() {
                   value={username}
                   onChange={e => { setUsername(e.target.value); setError('') }}
                   placeholder="Ej: 2021100001 · carlos.mendoza"
-                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-ar-cyan focus:ring-2 focus:ring-ar-cyan/30 transition-all"
+                  className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm text-white placeholder-white/30
+                             focus:outline-none focus:border-sbucks-accent focus:ring-2 focus:ring-sbucks-accent/30 transition-all"
+                  style={{ letterSpacing: '-0.01em' }}
                   autoComplete="username"
                   autoFocus
                 />
@@ -80,7 +91,8 @@ export default function LoginPage() {
 
               {/* Password */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-white/60 mb-2">
+                <label className="block text-xs font-bold text-white/60 mb-2 uppercase"
+                       style={{ letterSpacing: '0.1em' }}>
                   Contraseña
                 </label>
                 <div className="relative">
@@ -89,7 +101,9 @@ export default function LoginPage() {
                     value={password}
                     onChange={e => { setPassword(e.target.value); setError('') }}
                     placeholder="Contraseña"
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 pr-11 text-sm text-white placeholder-white/30 focus:outline-none focus:border-ar-cyan focus:ring-2 focus:ring-ar-cyan/30 transition-all"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 pr-11 text-sm text-white placeholder-white/30
+                               focus:outline-none focus:border-sbucks-accent focus:ring-2 focus:ring-sbucks-accent/30 transition-all"
+                    style={{ letterSpacing: '-0.01em' }}
                     autoComplete="current-password"
                   />
                   <button
@@ -102,26 +116,30 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Error */}
+              {/* Error — DESIGN.md semantic red (#c82014) */}
               <AnimatePresence>
                 {error && (
                   <motion.div
                     initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
-                    className="flex items-center gap-2 bg-red-500/20 border border-red-400/30 rounded-xl px-3 py-2.5"
+                    className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+                    style={{ background: 'rgba(200,32,20,0.15)', border: '1px solid rgba(200,32,20,0.30)' }}
                   >
-                    <AlertCircle size={14} className="text-red-400 flex-shrink-0" />
-                    <span className="text-red-300 text-xs">{error}</span>
+                    <AlertCircle size={14} style={{ color: '#f87171' }} className="flex-shrink-0" />
+                    <span className="text-xs" style={{ color: '#fca5a5' }}>{error}</span>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              {/* Submit */}
+              {/* Submit — DESIGN.md §4 Primary Filled: sbucks-accent, full-pill, scale(0.95) */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-sm py-3.5 rounded-full transition-all shadow-glow hover:shadow-lg"
+                className="w-full flex items-center justify-center gap-2 bg-sbucks-accent hover:bg-sbucks-green
+                           disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-sm
+                           py-3.5 rounded-pill transition-all shadow-glow active:scale-95"
+                style={{ letterSpacing: '-0.01em' }}
               >
                 {loading ? (
                   <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -151,10 +169,12 @@ export default function LoginPage() {
                     className="overflow-hidden"
                   >
                     <div className="mt-3 space-y-2">
-                      <div className="bg-white/5 rounded-xl p-3">
+                      <div className="bg-white/6 rounded-xl p-3">
                         <div className="flex items-center gap-2 mb-2">
-                          <BookOpen size={12} className="text-ar-cyan" />
-                          <span className="text-[0.7rem] font-bold uppercase tracking-wider text-white/50">Estudiantes</span>
+                          <BookOpen size={12} className="text-sbucks-light" />
+                          <span className="text-[0.7rem] font-bold text-white/50 uppercase" style={{ letterSpacing: '0.1em' }}>
+                            Estudiantes
+                          </span>
                         </div>
                         <div className="grid grid-cols-2 gap-1">
                           {students.slice(0, 4).map(s => (
@@ -169,10 +189,12 @@ export default function LoginPage() {
                           ))}
                         </div>
                       </div>
-                      <div className="bg-white/5 rounded-xl p-3">
+                      <div className="bg-white/6 rounded-xl p-3">
                         <div className="flex items-center gap-2 mb-2">
-                          <GraduationCap size={12} className="text-ar-cyan" />
-                          <span className="text-[0.7rem] font-bold uppercase tracking-wider text-white/50">Docentes</span>
+                          <GraduationCap size={12} className="text-sbucks-light" />
+                          <span className="text-[0.7rem] font-bold text-white/50 uppercase" style={{ letterSpacing: '0.1em' }}>
+                            Docentes
+                          </span>
                         </div>
                         <div className="space-y-1">
                           {professors.map(p => (
@@ -187,7 +209,9 @@ export default function LoginPage() {
                           ))}
                         </div>
                       </div>
-                      <p className="text-[0.68rem] text-white/30 text-center">Contraseña para todos: <span className="font-mono font-bold text-white/50">demo</span></p>
+                      <p className="text-[0.68rem] text-white/30 text-center">
+                        Contraseña para todos: <span className="font-mono font-bold text-white/50">demo</span>
+                      </p>
                     </div>
                   </motion.div>
                 )}
@@ -195,7 +219,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <p className="text-center text-white/30 text-xs mt-6">
+          <p className="text-center text-xs mt-6" style={{ color: 'rgba(255,255,255,0.30)', letterSpacing: '-0.01em' }}>
             Academic Risk · Plataforma multi-institucional · 2024-I
           </p>
         </motion.div>
