@@ -35,13 +35,29 @@ export const authService = {
    * Returns the TokenResponse so the caller can decode the user.
    */
   async login(email: string, password: string): Promise<TokenResponse> {
-    const tokens = await api.post<TokenResponse>(
-      '/auth/login',
-      { email, password },
-      { skipAuth: true },
-    )
-    tokenStore.setTokens(tokens.access_token, tokens.refresh_token)
-    return tokens
+    try {
+      const tokens = await api.post<TokenResponse>(
+        '/auth/login',
+        { email, password },
+        { skipAuth: true },
+      )
+      tokenStore.setTokens(tokens.access_token, tokens.refresh_token)
+      return tokens
+    } catch (err: unknown) {
+      // Re-throw with friendly message
+      if (err instanceof ApiError) {
+        if (err.status === 401 || err.status === 403) {
+          throw new Error('Correo o contraseña incorrectos. Verifica tus credenciales.')
+        }
+        if (err.status >= 500) {
+          throw new Error('El servidor no está disponible. Intenta más tarde.')
+        }
+      }
+      if (err instanceof TypeError) {
+        throw new Error('No se pudo conectar con el servidor. Verifica tu conexión.')
+      }
+      throw err
+    }
   },
 
   /**

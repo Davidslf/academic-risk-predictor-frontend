@@ -19,7 +19,20 @@ export interface BackendCourse {
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
+export interface CourseCreateInput {
+  code:            string
+  name:            string
+  credits:         number
+  academic_period: string
+  program_id:      string
+}
+
 export const courseService = {
+  /** Create a new course. */
+  async create(body: CourseCreateInput): Promise<BackendCourse> {
+    return api.post<BackendCourse>('/courses', body)
+  },
+
   /**
    * List courses belonging to a program.
    */

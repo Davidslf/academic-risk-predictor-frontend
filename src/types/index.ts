@@ -4,7 +4,8 @@ export interface AuthUser {
   id: string
   role: UserRole
   name: string
-  username: string      // student code or professor slug
+  username: string      // email used to login
+  email?: string        // same as username, explicit alias
   professorId?: string  // only when role === 'professor'
   studentId?: string    // only when role === 'student'
 }

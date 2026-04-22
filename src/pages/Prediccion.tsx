@@ -17,6 +17,8 @@ import { useGrades } from '../context/GradesContext'
 import { gradeColor } from '../utils/gradeCalculator'
 import type { Course } from '../types'
 import { predictionService } from '../services/predictionService'
+import { notificationService } from '../services/notificationService'
+import { courseService } from '../services/courseService'
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend)
 
@@ -592,6 +594,25 @@ export default function Prediccion() {
       }, user?.studentId)
       setResult(data as unknown as PredictionResult)
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+
+      // Notify professor when student has HIGH risk
+      if ((data as unknown as PredictionResult).nivel_riesgo === 'ALTO' && selectedCourse) {
+        void (async () => {
+          try {
+            const professor = await courseService.getCourseProf(selectedCourse.id)
+            await notificationService.sendRiskAlert({
+              student_name:    user?.name ?? 'Estudiante',
+              student_email:   user?.email ?? '',
+              professor_email: professor.email,
+              professor_name:  professor.full_name,
+              risk_level:      'ALTO',
+              course_name:     selectedCourse.name,
+            })
+          } catch {
+            // Notification failure is non-critical — silently ignore
+          }
+        })()
+      }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         setError('La petición tardó demasiado. El servidor puede estar iniciando (30–50 s). Intenta de nuevo.')

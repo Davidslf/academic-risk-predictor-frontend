@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Eye, EyeOff, ArrowRight, AlertCircle,
-  ChevronRight, GraduationCap, BookOpen, BarChart2
+  GraduationCap, BookOpen, BarChart2
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { professors, students, adminUser, DEMO_PASSWORD } from '../data/mockData'
+import { friendlyError } from '../services/errorMessages'
 
 // ─── Typewriter hook ──────────────────────────────────────────────────────────
 function useTypewriter(texts: string[], speed = 55, pause = 2200) {
@@ -37,21 +37,6 @@ function useTypewriter(texts: string[], speed = 55, pause = 2200) {
   }, [charIdx, deleting, textIdx, texts, speed, pause])
 
   return displayed
-}
-
-// ─── Local credential check (no auth state side-effects) ─────────────────────
-function checkCredentials(username: string, password: string) {
-  if (password !== DEMO_PASSWORD) return null
-  const trimmed = username.trim().toLowerCase()
-  if (trimmed === adminUser.username)
-    return { name: 'Administrador' }
-  const prof = professors.find(p => p.username.toLowerCase() === trimmed)
-  if (prof)
-    return { name: `${prof.title} ${prof.name.split(' ')[0]}` }
-  const student = students.find(s => s.studentCode === username.trim())
-  if (student)
-    return { name: student.name.split(' ')[0] }
-  return null
 }
 
 // ─── Welcome voice ────────────────────────────────────────────────────────────
@@ -323,14 +308,13 @@ function AnimatedBackground() {
 // ─── Login page ───────────────────────────────────────────────────────────────
 export default function LoginPage() {
   const { login } = useAuth()
-  const [username, setUsername]   = useState('')
-  const [password, setPassword]   = useState('')
-  const [showPass, setShowPass]   = useState(false)
-  const [error, setError]         = useState('')
-  const [loading, setLoading]     = useState(false)
+  const [email, setEmail]             = useState('')
+  const [password, setPassword]       = useState('')
+  const [showPass, setShowPass]       = useState(false)
+  const [error, setError]             = useState('')
+  const [loading, setLoading]         = useState(false)
   const [teleporting, setTeleporting] = useState(false)
-  const [userName, setUserName]   = useState('')
-  const [showHints, setShowHints] = useState(false)
+  const [userName, setUserName]       = useState('')
 
   const typewritten = useTypewriter([
     'Predice tu riesgo académico',
@@ -341,29 +325,31 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!username.trim() || !password.trim()) { setError('Completa todos los campos.'); return }
+    if (!email.trim() || !password.trim()) {
+      setError('Ingresa tu correo y contraseña.')
+      return
+    }
     setLoading(true)
     setError('')
 
-    // Small UX delay
-    await new Promise(r => setTimeout(r, 350))
+    const result = await login(email.trim(), password)
 
-    // Validate locally — no auth side-effects yet
-    const validated = checkCredentials(username, password)
-    if (!validated) {
-      setError('Credenciales inválidas. Verifica tu usuario y contraseña.')
+    if (!result.success) {
+      setError(result.error ?? 'No se pudo iniciar sesión.')
       setLoading(false)
       return
     }
 
-    // Show overlay + play voice BEFORE navigating
-    setUserName(validated.name)
+    // On success — get name from context (it was just set), show welcome overlay
+    const storedUser = localStorage.getItem('ar-user')
+    const name = storedUser ? (JSON.parse(storedUser) as { name: string }).name : email
+    const firstName = name.split(' ')[0]
+
+    setUserName(firstName)
     setLoading(false)
     setTeleporting(true)
-    playWelcomeVoice(validated.name)
-
-    // Actually set auth state after the overlay animation plays (~2.4 s)
-    setTimeout(() => void login(username, password), 2400)
+    playWelcomeVoice(firstName)
+    // Navigation happens automatically via Router redirect once user is set
   }
 
   return (
@@ -551,19 +537,20 @@ export default function LoginPage() {
                 onSubmit={handleSubmit}
                 className="space-y-4"
               >
-                {/* Username */}
+                {/* Email */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-usb-muted mb-2">
-                    Usuario
+                    Correo electrónico
                   </label>
                   <motion.input
                     whileFocus={{ scale: 1.01 }}
-                    type="text"
-                    value={username}
-                    onChange={e => { setUsername(e.target.value); setError('') }}
-                    placeholder="Código estudiantil o usuario"
+                    type="email"
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); setError('') }}
+                    placeholder="correo@ejemplo.edu"
                     className="w-full bg-usb-canvas border border-usb-border rounded-xl px-4 py-3 text-sm text-usb-text placeholder-usb-faint focus:outline-none focus:border-ar-cyan focus:ring-2 focus:ring-ar-cyan/20 transition-all"
                     autoFocus
+                    autoComplete="email"
                   />
                 </div>
 
@@ -629,91 +616,15 @@ export default function LoginPage() {
                 </motion.button>
               </motion.form>
 
-              {/* Demo credentials */}
-              <motion.div
+              {/* Footer note */}
+              <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.6 }}
-                className="mt-6 border-t border-usb-border pt-5"
+                className="mt-6 text-center text-xs text-usb-faint border-t border-usb-border pt-5"
               >
-                <button
-                  onClick={() => setShowHints(v => !v)}
-                  className="flex items-center gap-1.5 text-usb-faint hover:text-usb-muted text-xs transition-colors"
-                >
-                  <ChevronRight size={12} className={`transition-transform duration-200 ${showHints ? 'rotate-90' : ''}`} />
-                  Credenciales de demostración
-                </button>
-
-                <AnimatePresence>
-                  {showHints && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="mt-3 space-y-2">
-                        {/* Students */}
-                        <div className="bg-usb-canvas rounded-xl p-3 border border-usb-border">
-                          <div className="flex items-center gap-2 mb-2">
-                            <BookOpen size={12} className="text-ar-cyan" />
-                            <span className="text-[0.7rem] font-bold uppercase tracking-wider text-usb-muted">Estudiantes</span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-1">
-                            {students.slice(0, 4).map(s => (
-                              <button
-                                key={s.id} type="button"
-                                onClick={() => { setUsername(s.studentCode); setPassword('demo') }}
-                                className="text-left text-xs text-usb-muted hover:text-usb-text font-mono bg-white hover:bg-usb-canvas border border-usb-border rounded-lg px-2 py-1.5 transition-colors"
-                              >
-                                {s.studentCode}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Professors */}
-                        <div className="bg-usb-canvas rounded-xl p-3 border border-usb-border">
-                          <div className="flex items-center gap-2 mb-2">
-                            <GraduationCap size={12} className="text-ar-cyan" />
-                            <span className="text-[0.7rem] font-bold uppercase tracking-wider text-usb-muted">Docentes</span>
-                          </div>
-                          <div className="space-y-1">
-                            {professors.map(p => (
-                              <button
-                                key={p.id} type="button"
-                                onClick={() => { setUsername(p.username); setPassword('demo') }}
-                                className="w-full text-left text-xs text-usb-muted hover:text-usb-text font-mono bg-white hover:bg-usb-canvas border border-usb-border rounded-lg px-2 py-1.5 transition-colors"
-                              >
-                                {p.username}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Admin */}
-                        <div className="bg-usb-canvas rounded-xl p-3 border border-usb-border">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-[0.7rem] font-bold uppercase tracking-wider text-usb-muted">Admin</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => { setUsername('admin'); setPassword('demo') }}
-                            className="w-full text-left text-xs text-usb-muted hover:text-usb-text font-mono bg-white hover:bg-usb-canvas border border-usb-border rounded-lg px-2 py-1.5 transition-colors"
-                          >
-                            admin
-                          </button>
-                        </div>
-
-                        <p className="text-[0.68rem] text-usb-faint text-center">
-                          Contraseña para todos: <span className="font-mono font-bold text-usb-muted">demo</span>
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
+                Usa las credenciales asignadas por tu institución.
+              </motion.p>
             </div>
           </div>
         </motion.div>
