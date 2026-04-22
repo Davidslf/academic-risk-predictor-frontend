@@ -81,6 +81,11 @@ export const programService = {
     return api.get<BackendUniversity>(`/universities/${universityId}`)
   },
 
+  /** Get a single program by ID. */
+  async getProgram(programId: string): Promise<BackendProgram> {
+    return api.get<BackendProgram>(`/programs/${programId}`)
+  },
+
   /** Create a new university (requires ADMIN role). */
   async createUniversity(body: UniversityCreateInput): Promise<BackendUniversity> {
     return api.post<BackendUniversity>('/universities?actor_role=ADMIN', body)

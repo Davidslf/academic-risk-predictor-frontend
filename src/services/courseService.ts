@@ -5,6 +5,7 @@
 
 import { api } from './api'
 import type { BackendUser } from './authService'
+import type { PaginatedResponse } from './userService'
 
 // ─── Backend DTOs ─────────────────────────────────────────────────────────────
 
@@ -14,6 +15,9 @@ export interface BackendCourse {
   name:            string
   credits:         number
   academic_period: string
+  program_id:      string
+  professor_id?:   string | null
+  status:          'ACTIVE' | 'INACTIVE'
   created_at:      string
 }
 
@@ -73,5 +77,28 @@ export const courseService = {
     return api.get<BackendUser[]>(
       `/courses/${courseId}/students?professor_id=${professorId}`,
     )
+  },
+
+  /**
+   * Get a single course by ID.
+   */
+  async getById(courseId: string): Promise<BackendCourse> {
+    return api.get<BackendCourse>(`/courses/${courseId}`)
+  },
+
+  /**
+   * List courses with pagination (accessible by any authenticated user).
+   */
+  async listAll(params: {
+    status?: 'ACTIVE' | 'INACTIVE'
+    skip?:   number
+    limit?:  number
+  } = {}): Promise<PaginatedResponse<BackendCourse>> {
+    const qs = new URLSearchParams()
+    if (params.status) qs.set('status', params.status)
+    if (params.skip  != null) qs.set('skip',  String(params.skip))
+    if (params.limit != null) qs.set('limit', String(params.limit))
+    const query = qs.toString() ? `?${qs}` : ''
+    return api.get<PaginatedResponse<BackendCourse>>(`/courses${query}`)
   },
 }

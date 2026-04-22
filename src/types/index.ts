@@ -50,6 +50,7 @@ export interface Course {
   semester: string
   studentIds: string[]
   components: GradeComponent[]
+  program?: string
 }
 
 export type RiskLevel = 'high' | 'medium' | 'low' | null

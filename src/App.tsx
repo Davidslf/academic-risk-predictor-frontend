@@ -6,10 +6,12 @@ import { useGrades } from './context/GradesContext'
 import LoginPage from './pages/Login'
 import Landing from './pages/Landing'
 import Prediccion from './pages/Prediccion'
-import MisNotas from './pages/MisNotas'
+import MisMaterias from './pages/MisMaterias'
+import MateriaDetalle from './pages/MateriaDetalle'
 import Dashboard from './pages/Dashboard'
 import GradesPage from './pages/Grades'
 import AdminPage from './pages/Admin'
+import EstadisticasProfesor from './pages/EstadisticasProfesor'
 
 // ─── Error Boundary ──────────────────────────────────────────────────────────
 interface EBState { hasError: boolean; message: string }
@@ -159,8 +161,11 @@ export default function App() {
             <Route path="/prediccion" element={
               <RequireRole role="student"><Prediccion /></RequireRole>
             } />
-            <Route path="/mis-notas" element={
-              <RequireRole role="student"><MisNotas /></RequireRole>
+            <Route path="/mis-materias" element={
+              <RequireRole role="student"><MisMaterias /></RequireRole>
+            } />
+            <Route path="/materia/:courseId" element={
+              <RequireRole role="student"><MateriaDetalle /></RequireRole>
             } />
 
             {/* Professor */}
@@ -169,6 +174,9 @@ export default function App() {
             } />
             <Route path="/grades" element={
               <RequireRole role="professor"><ProfessorGrades /></RequireRole>
+            } />
+            <Route path="/estadisticas" element={
+              <RequireRole role="professor"><EstadisticasProfesor /></RequireRole>
             } />
 
             {/* Catch-all → redirect by role */}

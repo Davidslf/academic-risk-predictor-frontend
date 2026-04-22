@@ -10,6 +10,7 @@ import {
 } from 'react'
 import type { Course, Grade, GradeComponent } from '../types'
 import { courseService, type BackendCourse } from '../services/courseService'
+import { programService } from '../services/programService'
 
 interface GradesContextValue {
   courseList:         Course[]
@@ -36,7 +37,12 @@ function defaultComponents(courseId: string): GradeComponent[] {
 }
 
 // ─── Convert backend course → frontend Course ─────────────────────────────────
-function backendToFrontend(bc: BackendCourse, professorId: string): Course {
+function backendToFrontend(
+  bc: BackendCourse,
+  professorId: string,
+  studentIds: string[] = [],
+  programName?: string,
+): Course {
   return {
     id:         bc.id,
     code:       bc.code,
@@ -44,8 +50,9 @@ function backendToFrontend(bc: BackendCourse, professorId: string): Course {
     group:      'A',
     professorId,
     semester:   bc.academic_period ?? '2025-I',
-    studentIds: [],
+    studentIds,
     components: defaultComponents(bc.id),
+    program:    programName ?? bc.program_id,
   }
 }
 
@@ -80,7 +87,43 @@ export function GradesProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     try {
       const backendCourses = await courseService.listByProfessor(professorId)
-      setCourseList(backendCourses.map(bc => backendToFrontend(bc, professorId)))
+
+      // Collect unique program IDs and resolve their names
+      const programIds = [...new Set(backendCourses.map(bc => bc.program_id).filter(Boolean))]
+      const programNames: Record<string, string> = {}
+      const progResults = await Promise.allSettled(
+        programIds.map(async (pid) => {
+          const prog = await programService.getProgram(pid)
+          return { pid, name: prog.program_name }
+        }),
+      )
+      for (const r of progResults) {
+        if (r.status === 'fulfilled') {
+          programNames[r.value.pid] = r.value.name
+        } else {
+          console.warn('[GradesContext] Could not resolve program name:', r.reason)
+        }
+      }
+
+      // Fetch students for each course in parallel
+      const coursesWithStudents = await Promise.all(
+        backendCourses.map(async (bc) => {
+          let studentIds: string[] = []
+          try {
+            const students = await courseService.listCourseStudents(bc.id, professorId)
+            studentIds = students.map(s => s.id)
+          } catch { /* empty */ }
+
+          return backendToFrontend(
+            bc,
+            professorId,
+            studentIds,
+            programNames[bc.program_id] ?? bc.program_id,
+          )
+        }),
+      )
+
+      setCourseList(coursesWithStudents)
     } catch (err) {
       console.error('[GradesContext] Failed to load courses:', err)
       setCourseList([])
