@@ -1,14 +1,33 @@
+/**
+ * AuthContext — pure backend authentication.
+ * No mock data, no fallback. Login with email + password via JWT.
+ */
+
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import type { AuthUser, UserRole } from '../types'
-import { professors, students, DEMO_PASSWORD } from '../data/mockData'
+import { authService } from '../services/authService'
+import { tokenStore } from '../services/api'
+
+// ─── Context shape ────────────────────────────────────────────────────────────
 
 interface AuthContextValue {
-  user: AuthUser | null
-  login: (username: string, password: string) => { success: boolean; error?: string }
-  logout: () => void
+  user:     AuthUser | null
+  loading:  boolean
+  login:    (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  logout:   () => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+
+// ─── Role mapping ──────────────────────────────────────────────────────────────
+
+const ROLE_MAP: Record<string, UserRole> = {
+  STUDENT:   'student',
+  PROFESSOR: 'professor',
+  ADMIN:     'admin',
+}
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
@@ -18,7 +37,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch { /* ignore */ }
     return null
   })
+  const [loading, setLoading] = useState(false)
 
+  // Persist user to localStorage
   useEffect(() => {
     if (user) {
       localStorage.setItem('ar-user', JSON.stringify(user))
@@ -27,48 +48,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
-  const login = (username: string, password: string): { success: boolean; error?: string } => {
-    if (password !== DEMO_PASSWORD) {
-      return { success: false, error: 'Contraseña incorrecta. (Demo: usa "demo")' }
-    }
+  // ── Login ──────────────────────────────────────────────────────────────────
+  const login = async (
+    email: string,
+    password: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    setLoading(true)
+    try {
+      const tokens  = await authService.login(email.trim(), password)
+      const payload = authService.decodeToken(tokens.access_token)
 
-    const trimmed = username.trim().toLowerCase()
-
-    // Check professors first (by username slug)
-    const prof = professors.find(p => p.username.toLowerCase() === trimmed)
-    if (prof) {
-      const authUser: AuthUser = {
-        id: prof.id,
-        role: 'professor' as UserRole,
-        name: `${prof.title} ${prof.name}`,
-        username: prof.username,
-        professorId: prof.id,
+      if (!payload) {
+        tokenStore.clearTokens()
+        return { success: false, error: 'Respuesta inválida del servidor.' }
       }
+
+      const role = ROLE_MAP[payload.role as string] ?? 'student'
+
+      const authUser: AuthUser = {
+        id:       payload.sub as string,
+        role,
+        name:     (payload.full_name as string) ?? email,
+        username: email.trim(),
+        email:    email.trim(),
+        // Set role-specific ID fields
+        ...(role === 'professor' ? { professorId: payload.sub as string } : {}),
+        ...(role === 'student'   ? { studentId:   payload.sub as string } : {}),
+      }
+
       setUser(authUser)
       return { success: true }
-    }
-
-    // Check students (by student code)
-    const student = students.find(s => s.studentCode === trimmed || s.studentCode === username.trim())
-    if (student) {
-      const authUser: AuthUser = {
-        id: student.id,
-        role: 'student' as UserRole,
-        name: student.name,
-        username: student.studentCode,
-        studentId: student.id,
+    } catch (err: unknown) {
+      tokenStore.clearTokens()
+      // Return error message for the login page to handle
+      if (err instanceof Error) {
+        return { success: false, error: err.message }
       }
-      setUser(authUser)
-      return { success: true }
+      return { success: false, error: 'No se pudo iniciar sesión.' }
+    } finally {
+      setLoading(false)
     }
-
-    return { success: false, error: 'Usuario no encontrado. Verifica tu código o nombre de usuario.' }
   }
 
-  const logout = () => setUser(null)
+  // ── Logout ─────────────────────────────────────────────────────────────────
+  const logout = () => {
+    void authService.logout()
+    setUser(null)
+  }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

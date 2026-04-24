@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { LogOut, Cloud, Loader2, BarChart2, BookOpen, LayoutDashboard, ClipboardList } from 'lucide-react'
+import { LogOut, Cloud, Loader2, BarChart2, BookOpen, LayoutDashboard, HelpCircle, GraduationCap, Users } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 interface Props {
@@ -46,7 +46,7 @@ export default function Header({ lastSaved, subtitle }: Props) {
 
           {/* Nav links */}
           {isStudent && (
-            <nav className="hidden md:flex items-center gap-1 ml-2">
+            <nav id="tour-nav" className="hidden md:flex items-center gap-1 ml-2">
               <Link
                 to="/"
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
@@ -59,32 +59,21 @@ export default function Header({ lastSaved, subtitle }: Props) {
                 Inicio
               </Link>
               <Link
-                to="/mis-notas"
+                to="/mis-materias"
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  location.pathname === '/mis-notas'
+                  location.pathname.startsWith('/mis-materias') || location.pathname.startsWith('/materia/')
                     ? 'bg-ar-cyan/20 text-ar-cyan'
                     : 'text-white/50 hover:text-white hover:bg-white/5'
                 }`}
               >
-                <ClipboardList size={13} />
-                Mis Notas
-              </Link>
-              <Link
-                to="/prediccion"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  location.pathname === '/prediccion'
-                    ? 'bg-ar-cyan/20 text-ar-cyan'
-                    : 'text-white/50 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <BarChart2 size={13} />
-                Predicción
+                <GraduationCap size={13} />
+                Mi Progreso
               </Link>
             </nav>
           )}
 
           {isProfessor && (
-            <nav className="hidden md:flex items-center gap-1 ml-2">
+            <nav id="tour-prof-nav" className="hidden md:flex items-center gap-1 ml-2">
               <Link
                 to="/dashboard"
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
@@ -106,6 +95,17 @@ export default function Header({ lastSaved, subtitle }: Props) {
               >
                 <BookOpen size={13} />
                 Calificaciones
+              </Link>
+              <Link
+                to="/estadisticas"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  location.pathname === '/estadisticas'
+                    ? 'bg-ar-cyan/20 text-ar-cyan'
+                    : 'text-white/50 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Users size={13} />
+                Estadísticas
               </Link>
             </nav>
           )}
@@ -129,6 +129,15 @@ export default function Header({ lastSaved, subtitle }: Props) {
               )}
             </div>
           )}
+
+          {/* Tour help button */}
+          <button
+            onClick={() => window.dispatchEvent(new Event('ar:start-tour'))}
+            className="p-1.5 text-white/30 hover:text-ar-cyan hover:bg-white/10 rounded-lg transition-colors"
+            title="Repetir tour de bienvenida"
+          >
+            <HelpCircle size={15} />
+          </button>
 
           {/* Divider */}
           <div className="w-px h-5 bg-white/10" />

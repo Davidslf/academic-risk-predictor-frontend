@@ -40,8 +40,9 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Menlo', 'monospace'],
+        sans:    ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        display: ['Syne', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        mono:    ['"JetBrains Mono"', 'Menlo', 'monospace'],
       },
       borderRadius: {
         '4xl': '2rem',

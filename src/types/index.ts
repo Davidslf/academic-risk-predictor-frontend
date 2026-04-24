@@ -1,10 +1,11 @@
-export type UserRole = 'student' | 'professor'
+export type UserRole = 'student' | 'professor' | 'admin'
 
 export interface AuthUser {
   id: string
   role: UserRole
   name: string
-  username: string      // student code or professor slug
+  username: string      // email used to login
+  email?: string        // same as username, explicit alias
   professorId?: string  // only when role === 'professor'
   studentId?: string    // only when role === 'student'
 }
@@ -49,6 +50,29 @@ export interface Course {
   semester: string
   studentIds: string[]
   components: GradeComponent[]
+  program?: string
 }
 
 export type RiskLevel = 'high' | 'medium' | 'low' | null
+
+export interface University {
+  id: string
+  name: string
+  logo: string           // base64 data URL or empty string
+  createdAt: string      // ISO date string YYYY-MM-DD
+  programCount: number
+  status: 'active' | 'archived'
+  archivedAt?: string    // ISO date string, only when status === 'archived'
+}
+
+export type ProgramLevel = 'Pregrado' | 'Posgrado' | 'Técnico' | 'Tecnológico'
+
+export interface Program {
+  id: string
+  universityId: string
+  name: string
+  level: ProgramLevel
+  faculty: string
+  credits: number
+  duration: string       // e.g. "8 semestres"
+}

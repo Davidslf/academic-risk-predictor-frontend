@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   BarChart2, Send, X, Bot, User, ChevronDown,
   AlertTriangle, CheckCircle2, Loader2, Calculator,
-  RotateCcw, Info, Sparkles
+  RotateCcw, Info, Sparkles, BookOpen, ChevronRight
 } from 'lucide-react'
 import {
   Chart as ChartJS,
@@ -14,29 +14,32 @@ import { Doughnut, Bar } from 'react-chartjs-2'
 import Header from '../components/Header'
 import { useAuth } from '../context/AuthContext'
 import { useGrades } from '../context/GradesContext'
+import { gradeColor } from '../utils/gradeCalculator'
+import type { Course } from '../types'
+import { predictionService } from '../services/predictionService'
+import { notificationService } from '../services/notificationService'
+import { courseService } from '../services/courseService'
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend)
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-const API_BASE = 'https://academic-risk-api-1763919371.azurewebsites.net'
-
 const PROMEDIOS_APROBADOS = {
-  asistencia:   88.5,
-  seguimiento:  3.9,
-  parcial:      3.8,
-  logins:       56.2,
+  asistencia:  88.5,
+  seguimiento: 3.9,
+  parcial:     3.8,
+  logins:      56.2,
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface FormData {
-  asistencia:   number
-  seguimiento:  number
-  parcial:      number
-  logins:       number
-  tutorias:     boolean
+  asistencia:  number
+  seguimiento: number
+  parcial:     number
+  logins:      number
+  tutorias:    boolean
 }
 
 interface PredictionResult {
+  probabilidad_riesgo?: number
   porcentaje_riesgo: number
   nivel_riesgo: 'BAJO' | 'MEDIO' | 'ALTO'
   analisis_ia: string
@@ -46,13 +49,14 @@ interface PredictionResult {
     promedio_aprobado: number[]
   }
   detalles_matematicos: {
-    intercepto: number
-    coeficientes: number[]
-    features_scaled: number[]
+    intercepto?: number
+    coeficientes: number[] | Array<{ variable: string; coeficiente: number; valor: number; contribucion: number }>
+    features_scaled?: number[]
     formula_logit: string
-    formula_sigmoide: string
-    calculo_logit_texto: string
-    calculo_probabilidad_texto: string
+    formula_sigmoide?: string
+    calculo_logit_texto?: string
+    calculo_probabilidad_texto?: string
+    valor_z?: number
   }
 }
 
@@ -63,18 +67,18 @@ interface ChatMessage {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function riskColor(nivel: string) {
-  if (nivel === 'BAJO')  return '#10b981'
-  if (nivel === 'ALTO')  return '#ef4444'
-  return '#f59e0b'
+  if (nivel === 'BAJO') return '#16a34a'
+  if (nivel === 'ALTO') return '#dc2626'
+  return '#d97706'
 }
 function riskBgClass(nivel: string) {
-  if (nivel === 'BAJO')  return 'bg-emerald-50 border-emerald-200 text-emerald-700'
-  if (nivel === 'ALTO')  return 'bg-red-50 border-red-200 text-red-700'
+  if (nivel === 'BAJO') return 'bg-emerald-50 border-emerald-200 text-emerald-700'
+  if (nivel === 'ALTO') return 'bg-red-50 border-red-200 text-red-700'
   return 'bg-amber-50 border-amber-200 text-amber-700'
 }
 function riskIcon(nivel: string) {
-  if (nivel === 'BAJO')  return <CheckCircle2 size={16} />
-  if (nivel === 'ALTO')  return <AlertTriangle size={16} />
+  if (nivel === 'BAJO') return <CheckCircle2 size={16} />
+  if (nivel === 'ALTO') return <AlertTriangle size={16} />
   return <Info size={16} />
 }
 
@@ -82,85 +86,103 @@ function avg(arr: number[]) {
   return arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null
 }
 
-// ─── Derive predictor inputs from student grades ──────────────────────────────
-function deriveFormData(studentId: string, courseList: ReturnType<typeof useGrades>['courseList'], grades: ReturnType<typeof useGrades>['grades']): FormData {
-  const myCourses = courseList.filter(c => c.studentIds.includes(studentId))
+function fmt1(n: number) { return Math.round(n * 10) / 10 }
 
+// ─── Derive predictor inputs from a single course ────────────────────────────
+function deriveFromCourse(
+  studentId: string,
+  course: Course,
+  grades: ReturnType<typeof useGrades>['grades']
+): FormData {
   const parcialVals: number[] = []
   const quizVals:    number[] = []
   const asistVals:   number[] = []
 
-  for (const course of myCourses) {
-    for (const comp of course.components) {
-      const g = grades.find(gr => gr.studentId === studentId && gr.componentId === comp.id)
-      if (g?.value == null) continue
-      const name = comp.name.toLowerCase()
-      if (name.includes('parcial') || name.includes('examen')) parcialVals.push(g.value)
-      else if (name.includes('quiz') || name.includes('seguimiento') || name.includes('taller')) quizVals.push(g.value)
-      else if (name.includes('asist')) asistVals.push(g.value)
-    }
+  for (const comp of course.components) {
+    const g = grades.find(gr => gr.studentId === studentId && gr.componentId === comp.id)
+    if (g?.value == null) continue
+    const name = comp.name.toLowerCase()
+    if (name.includes('parcial') || name.includes('examen'))
+      parcialVals.push(g.value)
+    else if (name.includes('quiz') || name.includes('seguimiento') || name.includes('taller') || name.includes('proyecto'))
+      quizVals.push(g.value)
+    else if (name.includes('asist'))
+      asistVals.push(g.value)
   }
 
   return {
-    asistencia:  asistVals.length  > 0 ? Math.min(100, Math.round((avg(asistVals)!  * 20) * 10) / 10) : 85,
-    seguimiento: quizVals.length   > 0 ? Math.round(avg(quizVals)!   * 10) / 10 : 3.5,
-    parcial:     parcialVals.length > 0 ? Math.round(avg(parcialVals)! * 10) / 10 : 3.2,
-    logins:      42,   // not stored in grades — kept as manual
+    asistencia:  asistVals.length  > 0 ? Math.min(100, fmt1(avg(asistVals)!  * 20)) : 85,
+    seguimiento: quizVals.length   > 0 ? fmt1(avg(quizVals)!)   : 3.5,
+    parcial:     parcialVals.length > 0 ? fmt1(avg(parcialVals)!) : 3.2,
+    logins:      42,
     tutorias:    true,
   }
 }
 
-// ─── Slider ──────────────────────────────────────────────────────────────────
-function Slider({
-  label, value, min, max, step, unit, onChange, locked
+// ─── Grade cards panel ───────────────────────────────────────────────────────
+function CourseGradePanel({
+  course, studentId, grades
 }: {
-  label: string; value: number; min: number; max: number
-  step: number; unit?: string; onChange: (v: number) => void; locked?: boolean
+  course: Course
+  studentId: string
+  grades: ReturnType<typeof useGrades>['grades']
 }) {
-  const pct = ((value - min) / (max - min)) * 100
   return (
-    <div className={`mb-5 ${locked ? 'opacity-75' : ''}`}>
+    <div className="space-y-2">
+      {course.components.map(comp => {
+        const g = grades.find(gr => gr.studentId === studentId && gr.componentId === comp.id)
+        const val = g?.value ?? null
+        return (
+          <div
+            key={comp.id}
+            className="flex items-center justify-between px-4 py-3 bg-usb-canvas rounded-xl border border-usb-border hover:border-ar-cyan/30 transition-colors"
+          >
+            <span className="text-sm font-medium text-usb-subtle leading-tight">{comp.name}</span>
+            <div className="flex items-center gap-2.5 flex-shrink-0 ml-2">
+              <span className="text-[0.7rem] font-bold text-ar-cyan bg-ar-cyan/10 border border-ar-cyan/20 px-2 py-0.5 rounded-full">
+                {comp.percentage}%
+              </span>
+              {val !== null ? (
+                <span className={`font-mono font-extrabold text-sm w-10 text-right tabular-nums ${gradeColor(val)}`}>
+                  {val.toFixed(1)}
+                </span>
+              ) : (
+                <span className="font-mono text-usb-faint text-sm w-10 text-right">—</span>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Logins slider (only manual input left) ──────────────────────────────────
+function LoginsSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const pct = (value / 100) * 100
+  return (
+    <div className="mb-5">
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <label className="text-sm font-semibold text-usb-subtle">{label}</label>
-          {locked && (
-            <span className="text-[0.6rem] font-bold uppercase tracking-wider text-ar-cyan bg-ar-cyan/10 px-1.5 py-0.5 rounded-full border border-ar-cyan/20">
-              Desde tus notas · solo lectura
-            </span>
-          )}
-        </div>
-        <span className={`inline-block text-xs font-bold px-3 py-1 rounded-full min-w-[52px] text-center ${
-          locked ? 'bg-usb-canvas border border-usb-border text-usb-subtle' : 'bg-ar-navy text-white'
-        }`}>
-          {value}{unit ?? ''}
+        <label className="text-sm font-semibold text-usb-subtle">Inicios de sesión plataforma</label>
+        <span className="inline-block text-xs font-bold px-3 py-1 rounded-full min-w-[52px] text-center bg-ar-navy text-white">
+          {value}
         </span>
       </div>
-      <div className={`relative h-2 rounded-full ${locked ? 'bg-usb-border/60' : 'bg-usb-border'}`}>
-        <div
-          className={`absolute h-2 rounded-full transition-all ${locked ? 'bg-ar-cyan/40' : 'bg-ar-cyan'}`}
-          style={{ width: `${pct}%` }}
+      <div className="relative h-2 rounded-full bg-usb-border">
+        <div className="absolute h-2 rounded-full bg-ar-cyan transition-all" style={{ width: `${pct}%` }} />
+        <input
+          type="range" min={0} max={100} step={1} value={value}
+          onChange={e => onChange(parseInt(e.target.value))}
+          className="absolute inset-0 w-full opacity-0 cursor-pointer h-2"
         />
-        {/* Only render interactive input when NOT locked */}
-        {!locked && (
-          <input
-            type="range"
-            min={min} max={max} step={step} value={value}
-            onChange={e => onChange(parseFloat(e.target.value))}
-            className="absolute inset-0 w-full opacity-0 cursor-pointer h-2"
-          />
-        )}
         <div
-          className={`absolute w-4 h-4 rounded-full shadow-sm -translate-y-1 -translate-x-2 pointer-events-none transition-all ${
-            locked
-              ? 'bg-usb-canvas border-2 border-usb-border'
-              : 'bg-white border-2 border-ar-cyan'
-          }`}
+          className="absolute w-4 h-4 rounded-full shadow-sm -translate-y-1 -translate-x-2 bg-white border-2 border-ar-cyan pointer-events-none transition-all"
           style={{ left: `${pct}%` }}
         />
       </div>
       <div className="flex justify-between mt-1">
-        <span className="text-[0.65rem] text-usb-faint">{min}{unit ?? ''}</span>
-        <span className="text-[0.65rem] text-usb-faint">{max}{unit ?? ''}</span>
+        <span className="text-[0.65rem] text-usb-faint">0</span>
+        <span className="text-[0.65rem] text-usb-faint">100</span>
       </div>
     </div>
   )
@@ -169,12 +191,13 @@ function Slider({
 // ─── Gauge ───────────────────────────────────────────────────────────────────
 function GaugeChart({ pct, nivel }: { pct: number; nivel: string }) {
   const color = riskColor(nivel)
+  const displayPct = fmt1(pct)
   return (
     <div className="relative">
       <Doughnut
         data={{
           datasets: [{
-            data: [pct, 100 - pct],
+            data: [displayPct, 100 - displayPct],
             backgroundColor: [color, '#e5e7eb'],
             borderWidth: 0,
             circumference: 180,
@@ -182,16 +205,18 @@ function GaugeChart({ pct, nivel }: { pct: number; nivel: string }) {
           }],
         }}
         options={{
-          cutout: '72%',
+          cutout: '70%',
           plugins: { legend: { display: false }, tooltip: { enabled: false } },
           responsive: true,
           maintainAspectRatio: true,
           aspectRatio: 2,
         } as any}
       />
-      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center pb-2">
-        <span className="text-3xl font-extrabold" style={{ color }}>{pct}%</span>
-        <span className="text-xs text-usb-muted font-medium">de riesgo</span>
+      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center pb-1">
+        <span className="text-4xl font-black tabular-nums" style={{ color }}>
+          {displayPct}%
+        </span>
+        <span className="text-xs text-usb-muted font-semibold tracking-wide">de riesgo</span>
       </div>
     </div>
   )
@@ -203,29 +228,51 @@ function CompareBar({ title, labels, studentVals, avgVals, maxY, stepY }: {
   avgVals: number[]; maxY?: number; stepY?: number
 }) {
   return (
-    <Bar
-      data={{
-        labels,
-        datasets: [
-          { label: 'Tus datos',           data: studentVals, backgroundColor: 'rgba(0,180,216,0.8)', borderRadius: 6 },
-          { label: 'Promedio aprobados',   data: avgVals,     backgroundColor: 'rgba(16,185,129,0.7)', borderRadius: 6 },
-        ],
-      }}
-      options={{
-        responsive: true,
-        plugins: {
-          legend: { position: 'top', labels: { font: { size: 11 } } },
-          title: { display: true, text: title, font: { size: 12, weight: 'bold' } },
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ...(maxY  ? { max: maxY }           : {}),
-            ...(stepY ? { ticks: { stepSize: stepY } } : {}),
+    <div style={{ height: '220px' }}>
+      <Bar
+        data={{
+          labels,
+          datasets: [
+            { label: 'Tus datos',          data: studentVals, backgroundColor: 'rgba(0,180,216,0.85)', borderRadius: 8, borderSkipped: false },
+            { label: 'Promedio aprobados', data: avgVals,     backgroundColor: 'rgba(22,163,74,0.75)',  borderRadius: 8, borderSkipped: false },
+          ],
+        }}
+        options={{
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                font: { size: 11, family: "'Plus Jakarta Sans', system-ui, sans-serif" },
+                padding: 12,
+                usePointStyle: true,
+                pointStyleWidth: 8,
+              },
+            },
+            title: {
+              display: true,
+              text: title,
+              font: { size: 12, weight: 'bold', family: "'Plus Jakarta Sans', system-ui, sans-serif" },
+              padding: { bottom: 8 },
+            },
           },
-        },
-      } as any}
-    />
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(0,0,0,0.04)' },
+              ticks: { font: { size: 10 } },
+              ...(maxY  ? { max: maxY }                    : {}),
+              ...(stepY ? { ticks: { stepSize: stepY, font: { size: 10 } } } : {}),
+            },
+            x: {
+              grid: { display: false },
+              ticks: { font: { size: 11 } },
+            },
+          },
+        } as any}
+      />
+    </div>
   )
 }
 
@@ -251,28 +298,19 @@ function ChatBot({ result, formData }: { result: PredictionResult | null; formDa
     setLoading(true)
 
     try {
-      const ctrl = new AbortController()
-      const timer = setTimeout(() => ctrl.abort(), 30000)
-      const res = await fetch(`${API_BASE}/api/v1/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: ctrl.signal,
-        body: JSON.stringify({
-          pregunta: text,
-          datos_estudiante: {
-            promedio_asistencia:       formData.asistencia,
-            promedio_seguimiento:      formData.seguimiento,
-            nota_parcial_1:            formData.parcial,
-            inicios_sesion_plataforma: formData.logins,
-            uso_tutorias:              formData.tutorias ? 1 : 0,
-          },
-          prediccion_actual: result,
-        }),
+      const data = await predictionService.chat({
+        message: text,
+        context: {
+          promedio_asistencia:       formData.asistencia,
+          promedio_seguimiento:      formData.seguimiento,
+          nota_parcial_1:            formData.parcial,
+          inicios_sesion_plataforma: formData.logins,
+          uso_tutorias:              formData.tutorias ? 1 : 0,
+          nivel_riesgo:              result?.nivel_riesgo,
+          probabilidad_riesgo:       result?.probabilidad_riesgo,
+        },
       })
-      clearTimeout(timer)
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-      setMessages(prev => [...prev, { role: 'bot', text: data.respuesta }])
+      setMessages(prev => [...prev, { role: 'bot', text: data.response }])
     } catch {
       setMessages(prev => [...prev, { role: 'bot', text: 'Lo siento, no pude conectarme al servidor. Intenta de nuevo más tarde.' }])
     } finally {
@@ -282,7 +320,6 @@ function ChatBot({ result, formData }: { result: PredictionResult | null; formDa
 
   return (
     <>
-      {/* Floating toggle button — ALWAYS visible */}
       <AnimatePresence>
         {!open && (
           <motion.button
@@ -300,7 +337,6 @@ function ChatBot({ result, formData }: { result: PredictionResult | null; formDa
         )}
       </AnimatePresence>
 
-      {/* Chat window */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -312,7 +348,6 @@ function ChatBot({ result, formData }: { result: PredictionResult | null; formDa
             className="fixed bottom-6 right-6 w-80 sm:w-96 bg-white rounded-2xl shadow-modal border border-usb-border flex flex-col z-50"
             style={{ maxHeight: '70vh' }}
           >
-            {/* Header */}
             <div className="bg-ar-navy px-4 py-3 flex items-center justify-between flex-shrink-0 rounded-t-2xl">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-ar-cyan/20 border border-ar-cyan/30 flex items-center justify-center">
@@ -328,23 +363,24 @@ function ChatBot({ result, formData }: { result: PredictionResult | null; formDa
               </button>
             </div>
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-usb-canvas">
               {messages.map((m, i) => (
                 <div key={i} className={`flex items-end gap-2 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
                     m.role === 'bot' ? 'bg-ar-cyan/20 border border-ar-cyan/30' : 'bg-ar-navy'
                   }`}>
-                    {m.role === 'bot'
-                      ? <Bot size={13} className="text-ar-cyan" />
-                      : <User size={13} className="text-white" />}
+                    {m.role === 'bot' ? <Bot size={13} className="text-ar-cyan" /> : <User size={13} className="text-white" />}
                   </div>
-                  <div className={`max-w-[78%] px-3 py-2 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
+                  <div className={`max-w-[78%] px-3 py-2 rounded-2xl text-xs leading-relaxed ${
                     m.role === 'bot'
                       ? 'bg-white border border-usb-border text-usb-subtle rounded-bl-none'
                       : 'bg-ar-navy text-white rounded-br-none'
                   }`}>
-                    {m.text.replace(/\*\*(.*?)\*\*/g, '$1')}
+                    {m.text.split(/\*\*(.*?)\*\*/g).map((part, j) =>
+                      j % 2 === 1
+                        ? <strong key={j} className="font-semibold">{part}</strong>
+                        : <span key={j} className="whitespace-pre-wrap">{part}</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -365,7 +401,6 @@ function ChatBot({ result, formData }: { result: PredictionResult | null; formDa
               <div ref={endRef} />
             </div>
 
-            {/* Input */}
             <div className="border-t border-usb-border p-3 flex gap-2 bg-white flex-shrink-0 rounded-b-2xl">
               <input
                 value={input}
@@ -389,10 +424,57 @@ function ChatBot({ result, formData }: { result: PredictionResult | null; formDa
   )
 }
 
+// ─── Simple markdown renderer (bold + bullets + hr) ─────────────────────────
+function MarkdownText({ text }: { text: string }) {
+  const lines = text.split('\n')
+  return (
+    <div className="space-y-1 text-sm text-usb-subtle leading-relaxed">
+      {lines.map((line, i) => {
+        if (line.trim() === '---') {
+          return <hr key={i} className="border-usb-border my-2" />
+        }
+
+        // Parse **bold** inline
+        const parts = line.split(/\*\*(.*?)\*\*/g)
+        const rendered = parts.map((part, j) =>
+          j % 2 === 1
+            ? <strong key={j} className="font-semibold text-usb-text">{part}</strong>
+            : <span key={j}>{part}</span>
+        )
+
+        if (!line.trim()) return <div key={i} className="h-2" />
+        return <p key={i}>{rendered}</p>
+      })}
+    </div>
+  )
+}
+
 // ─── Math modal ───────────────────────────────────────────────────────────────
 function MathModal({ result, onClose }: { result: PredictionResult; onClose: () => void }) {
   const d = result.detalles_matematicos
   const featureNames = ['Asistencia', 'Seguimiento', 'Parcial 1', 'Inicios Sesión', 'Tutorías']
+
+  // Support both backend formats:
+  // Old: coeficientes = number[], features_scaled = number[]
+  // New: coeficientes = { variable, coeficiente, valor, contribucion }[]
+  type NewCoef = { variable: string; coeficiente: number; valor: number; contribucion: number }
+  const isNewFormat = d.coeficientes.length > 0 && typeof d.coeficientes[0] === 'object'
+
+  const rows = featureNames.map((name, i) => {
+    if (isNewFormat) {
+      const coef = d.coeficientes[i] as NewCoef | undefined
+      return {
+        name:    coef?.variable ?? name,
+        scaled:  coef?.valor ?? 0,
+        coef:    coef?.coeficiente ?? 0,
+        impact:  coef?.contribucion ?? 0,
+      }
+    }
+    const scaled  = (d.features_scaled ?? [])[i] ?? 0
+    const coefNum = d.coeficientes[i] as number ?? 0
+    return { name, scaled, coef: coefNum, impact: scaled * coefNum }
+  })
+
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -423,30 +505,32 @@ function MathModal({ result, onClose }: { result: PredictionResult; onClose: () 
                 </tr>
               </thead>
               <tbody>
-                {featureNames.map((name, i) => {
-                  const impact = (d.features_scaled[i] ?? 0) * (d.coeficientes[i] ?? 0)
-                  return (
-                    <tr key={name} className="border-b border-usb-border">
-                      <td className="px-3 py-2 font-medium text-usb-subtle">{name}</td>
-                      <td className="px-3 py-2 text-center font-mono text-usb-muted">{(d.features_scaled[i] ?? 0).toFixed(4)}</td>
-                      <td className="px-3 py-2 text-center font-mono text-ar-cyan font-semibold">{(d.coeficientes[i] ?? 0).toFixed(4)}</td>
-                      <td className={`px-3 py-2 text-center font-mono font-bold ${impact < 0 ? 'text-emerald-600' : 'text-red-500'}`}>{impact.toFixed(4)}</td>
-                    </tr>
-                  )
-                })}
+                {rows.map(({ name, scaled, coef, impact }) => (
+                  <tr key={name} className="border-b border-usb-border">
+                    <td className="px-3 py-2 font-medium text-usb-subtle">{name}</td>
+                    <td className="px-3 py-2 text-center font-mono text-usb-muted">{scaled.toFixed(4)}</td>
+                    <td className="px-3 py-2 text-center font-mono text-ar-cyan font-semibold">{coef.toFixed(4)}</td>
+                    <td className={`px-3 py-2 text-center font-mono font-bold ${impact < 0 ? 'text-emerald-600' : 'text-red-500'}`}>{impact.toFixed(4)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
           {[
-            { label: 'Intercepto', val: d.intercepto.toFixed(6) },
-            { label: 'Cálculo z (logit)', val: d.calculo_logit_texto },
-            { label: 'Probabilidad σ(z)', val: d.calculo_probabilidad_texto },
-          ].map(({ label, val }) => (
-            <div key={label} className="bg-usb-canvas rounded-xl p-4 border border-usb-border">
-              <p className="text-xs font-bold uppercase tracking-wider text-usb-muted mb-2">{label}</p>
-              <p className="font-mono text-xs text-usb-subtle leading-relaxed break-all">{val}</p>
-            </div>
-          ))}
+            d.intercepto != null && { label: 'Intercepto', val: d.intercepto.toFixed(6) },
+            d.valor_z    != null && { label: 'Valor z (logit)', val: d.valor_z.toFixed(6) },
+            d.formula_logit      && { label: 'Fórmula logit', val: d.formula_logit },
+            d.calculo_logit_texto      && { label: 'Cálculo z (logit)', val: d.calculo_logit_texto },
+            d.calculo_probabilidad_texto && { label: 'Probabilidad σ(z)', val: d.calculo_probabilidad_texto },
+          ].filter(Boolean).map(item => {
+            const { label, val } = item as { label: string; val: string }
+            return (
+              <div key={label} className="bg-usb-canvas rounded-xl p-4 border border-usb-border">
+                <p className="text-xs font-bold uppercase tracking-wider text-usb-muted mb-2">{label}</p>
+                <p className="font-mono text-xs text-usb-subtle leading-relaxed break-all">{val}</p>
+              </div>
+            )
+          })}
         </div>
       </motion.div>
     </motion.div>
@@ -458,69 +542,89 @@ export default function Prediccion() {
   const { user } = useAuth()
   const { courseList, grades } = useGrades()
 
-  // Derive initial form values from student's actual grades
-  const derivedForm = useMemo(
-    () => deriveFormData(user?.studentId ?? '', courseList, grades),
-    [user?.studentId, courseList, grades]
+  // Courses the student is enrolled in
+  const myCourses = useMemo(
+    () => courseList.filter(c => c.studentIds.includes(user?.studentId ?? '')),
+    [courseList, user?.studentId]
   )
 
-  const [form, setForm] = useState<FormData>(derivedForm)
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('')
   const [result, setResult] = useState<PredictionResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError]   = useState('')
+  const [error, setError] = useState('')
   const [showMath, setShowMath] = useState(false)
   const resultsRef = useRef<HTMLDivElement>(null)
 
-  // Check how many values were auto-filled vs defaulted
-  const hasGradesData = useMemo(() => {
-    const myCourses = courseList.filter(c => c.studentIds.includes(user?.studentId ?? ''))
-    return myCourses.some(course =>
-      course.components.some(comp => {
-        const g = grades.find(gr => gr.studentId === user?.studentId && gr.componentId === comp.id)
-        return g?.value != null
-      })
-    )
-  }, [courseList, grades, user?.studentId])
+  // Initialize selector to first course
+  useEffect(() => {
+    if (myCourses.length > 0 && !selectedCourseId) {
+      setSelectedCourseId(myCourses[0].id)
+    }
+  }, [myCourses, selectedCourseId])
+
+  const selectedCourse = myCourses.find(c => c.id === selectedCourseId) ?? null
+
+  // Derive form from selected course
+  const form = useMemo(
+    () => selectedCourse
+      ? deriveFromCourse(user?.studentId ?? '', selectedCourse, grades)
+      : { asistencia: 85, seguimiento: 3.5, parcial: 3.2, logins: 42, tutorias: true },
+    [user?.studentId, selectedCourse, grades]
+  )
+
+  const [logins, setLogins] = useState(42)
+  const [tutorias, setTutorias] = useState(true)
+
+  // Merge manual inputs with derived form
+  const finalForm: FormData = { ...form, logins, tutorias }
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!selectedCourse) return
     setLoading(true)
     setError('')
 
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 30000)
-
     try {
-      const res = await fetch(`${API_BASE}/api/v1/predict`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: ctrl.signal,
-        body: JSON.stringify({
-          promedio_asistencia:        form.asistencia,
-          promedio_seguimiento:       form.seguimiento,
-          nota_parcial_1:             form.parcial,
-          inicios_sesion_plataforma:  form.logins,
-          uso_tutorias:               form.tutorias ? 1 : 0,
-        }),
-      })
-      clearTimeout(timer)
-      if (!res.ok) throw new Error(`Error ${res.status}`)
-      const data: PredictionResult = await res.json()
-      setResult(data)
+      const data = await predictionService.predict({
+        promedio_asistencia:        finalForm.asistencia,
+        promedio_seguimiento:       finalForm.seguimiento,
+        nota_parcial_1:             finalForm.parcial,
+        inicios_sesion_plataforma:  finalForm.logins,
+        uso_tutorias:               finalForm.tutorias ? 1 : 0,
+      }, user?.studentId)
+      setResult(data as unknown as PredictionResult)
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+
+      // Notify professor when student has HIGH risk
+      if ((data as unknown as PredictionResult).nivel_riesgo === 'ALTO' && selectedCourse) {
+        void (async () => {
+          try {
+            const professor = await courseService.getCourseProf(selectedCourse.id)
+            await notificationService.sendRiskAlert({
+              student_name:    user?.name ?? 'Estudiante',
+              student_email:   user?.email ?? '',
+              professor_email: professor.email,
+              professor_name:  professor.full_name,
+              risk_level:      'ALTO',
+              course_name:     selectedCourse.name,
+            })
+          } catch {
+            // Notification failure is non-critical — silently ignore
+          }
+        })()
+      }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
         setError('La petición tardó demasiado. El servidor puede estar iniciando (30–50 s). Intenta de nuevo.')
       } else {
-        setError('No se pudo conectar con el servidor. Verifica tu conexión.')
+        setError('No se pudo conectar con el servidor. Verifica tu conexión o que el backend esté corriendo.')
       }
     } finally {
       setLoading(false)
     }
-  }, [form])
+  }, [finalForm, selectedCourse])
 
   const reset = () => {
-    setForm(derivedForm)
     setResult(null)
     setError('')
   }
@@ -530,16 +634,16 @@ export default function Prediccion() {
       <Header />
 
       {/* Page title */}
-      <div className="bg-ar-navy border-b border-white/10 px-5 py-5">
+      <div className="bg-ar-navy border-b border-white/10 px-5 py-6">
         <div className="max-w-5xl mx-auto">
-          <div className="flex items-center gap-2 mb-1">
-            <BarChart2 size={18} className="text-ar-cyan" />
-            <h1 className="text-white font-extrabold text-xl">Predicción Académica</h1>
+          <div className="flex items-center gap-3 mb-1">
+            <BarChart2 size={20} className="text-ar-cyan" />
+            <h1 className="text-white font-black text-2xl tracking-tight">
+              Predicción Académica
+            </h1>
           </div>
           <p className="text-white/50 text-sm">
-            {hasGradesData
-              ? 'Tus datos académicos fueron cargados automáticamente desde tus notas registradas.'
-              : 'Ajusta tus variables y calcula tu nivel de riesgo académico.'}
+            Selecciona una materia y calcula tu nivel de riesgo académico con inteligencia artificial.
           </p>
         </div>
       </div>
@@ -551,101 +655,125 @@ export default function Prediccion() {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-card border border-usb-border p-6 sticky top-20">
 
-              {/* Auto-fill banner */}
-              {hasGradesData && (
-                <div className="flex items-start gap-2 bg-ar-cyan/10 border border-ar-cyan/20 rounded-xl px-3 py-2.5 mb-5">
-                  <Sparkles size={14} className="text-ar-cyan mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-ar-navy font-medium leading-relaxed">
-                    Variables completadas automáticamente desde tus notas. Solo ajusta los datos que faltan.
-                  </p>
+              {/* Step 1 — course selector */}
+              <div className="mb-6">
+                <h2 className="font-bold text-usb-text mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-ar-cyan text-white flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                  Selecciona tu materia
+                </h2>
+
+                {myCourses.length === 0 ? (
+                  <div className="bg-usb-canvas rounded-xl border border-usb-border p-4 text-center">
+                    <BookOpen size={20} className="text-usb-faint mx-auto mb-2" />
+                    <p className="text-usb-muted text-xs">No estás inscrito en materias</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {myCourses.map(course => (
+                      <button
+                        key={course.id}
+                        type="button"
+                        onClick={() => { setSelectedCourseId(course.id); setResult(null) }}
+                        className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between gap-2 ${
+                          selectedCourseId === course.id
+                            ? 'border-ar-cyan bg-ar-cyan/5 shadow-sm'
+                            : 'border-usb-border bg-usb-canvas hover:border-ar-cyan/40'
+                        }`}
+                      >
+                        <div>
+                          <p className={`text-sm font-semibold leading-tight ${selectedCourseId === course.id ? 'text-ar-navy' : 'text-usb-subtle'}`}>
+                            {course.name}
+                          </p>
+                          <p className="text-[0.65rem] text-usb-faint mt-0.5">
+                            {course.code} · {course.group} · {course.semester}
+                          </p>
+                        </div>
+                        {selectedCourseId === course.id && (
+                          <ChevronRight size={16} className="text-ar-cyan flex-shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Step 2 — grade breakdown for selected course */}
+              {selectedCourse && (
+                <div className="mb-6">
+                  <h2 className="font-bold text-usb-text mb-3 flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-ar-cyan/20 text-ar-cyan flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                    Calificaciones
+                  </h2>
+                  <CourseGradePanel
+                    course={selectedCourse}
+                    studentId={user?.studentId ?? ''}
+                    grades={grades}
+                  />
                 </div>
               )}
 
-              <h2 className="font-bold text-usb-text mb-5 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-ar-cyan/20 text-ar-cyan flex items-center justify-center text-xs font-bold">1</span>
-                Tus variables académicas
-              </h2>
+              {/* Step 3 — complementary manual inputs */}
+              {selectedCourse && (
+                <form onSubmit={handleSubmit}>
+                  <h2 className="font-bold text-usb-text mb-4 flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-ar-cyan/20 text-ar-cyan flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                    Datos complementarios
+                  </h2>
 
-              <form onSubmit={handleSubmit}>
-                <Slider
-                  label="Asistencia a clases"
-                  value={form.asistencia}
-                  min={0} max={100} step={0.1} unit="%"
-                  locked={hasGradesData}
-                  onChange={v => setForm(f => ({ ...f, asistencia: v }))}
-                />
-                <Slider
-                  label="Promedio de seguimiento"
-                  value={form.seguimiento}
-                  min={0} max={5} step={0.1}
-                  locked={hasGradesData}
-                  onChange={v => setForm(f => ({ ...f, seguimiento: v }))}
-                />
-                <Slider
-                  label="Nota parcial 1"
-                  value={form.parcial}
-                  min={0} max={5} step={0.1}
-                  locked={hasGradesData}
-                  onChange={v => setForm(f => ({ ...f, parcial: v }))}
-                />
-                <Slider
-                  label="Inicios de sesión plataforma"
-                  value={form.logins}
-                  min={0} max={100} step={1}
-                  onChange={v => setForm(f => ({ ...f, logins: v }))}
-                />
+                  <LoginsSlider value={logins} onChange={setLogins} />
 
-                {/* Tutorías toggle */}
-                <div className="mb-6">
-                  <label className="text-sm font-semibold text-usb-subtle mb-2 block">Uso de tutorías</label>
-                  <button
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, tutorias: !f.tutorias }))}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-sm font-medium ${
-                      form.tutorias
-                        ? 'border-ar-cyan bg-ar-cyan/5 text-ar-navy'
-                        : 'border-usb-border bg-usb-canvas text-usb-muted'
-                    }`}
-                  >
-                    <span>{form.tutorias ? '✅ Sí, uso tutorías' : '❌ No uso tutorías'}</span>
-                    <div className={`w-10 h-5 rounded-full relative transition-colors ${form.tutorias ? 'bg-ar-cyan' : 'bg-usb-border'}`}>
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${form.tutorias ? 'left-5' : 'left-0.5'}`} />
-                    </div>
-                  </button>
-                </div>
-
-                {/* Error */}
-                <AnimatePresence>
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                      className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5"
+                  {/* Tutorías toggle */}
+                  <div className="mb-6">
+                    <label className="text-sm font-semibold text-usb-subtle mb-2 block">Uso de tutorías</label>
+                    <button
+                      type="button"
+                      onClick={() => setTutorias(t => !t)}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-sm font-medium ${
+                        tutorias
+                          ? 'border-ar-cyan bg-ar-cyan/5 text-ar-navy'
+                          : 'border-usb-border bg-usb-canvas text-usb-muted'
+                      }`}
                     >
-                      <AlertTriangle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
-                      <p className="text-red-600 text-xs leading-relaxed">{error}</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      <span>{tutorias ? '✅ Sí, uso tutorías' : '❌ No uso tutorías'}</span>
+                      <div className={`w-10 h-5 rounded-full relative transition-colors ${tutorias ? 'bg-ar-cyan' : 'bg-usb-border'}`}>
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${tutorias ? 'left-5' : 'left-0.5'}`} />
+                      </div>
+                    </button>
+                  </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-60 text-white font-bold py-3.5 rounded-full transition-all shadow-glow hover:shadow-lg"
-                >
-                  {loading
-                    ? <><Loader2 size={16} className="animate-spin" /> Calculando…</>
-                    : <><Sparkles size={16} /> Calcular mi riesgo</>
-                  }
-                </button>
+                  {/* Error */}
+                  <AnimatePresence>
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                        className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5"
+                      >
+                        <AlertTriangle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
+                        <p className="text-red-600 text-xs leading-relaxed">{error}</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                {result && (
-                  <button type="button" onClick={reset}
-                    className="w-full flex items-center justify-center gap-1.5 text-usb-muted hover:text-usb-text text-xs font-medium mt-2 py-2 transition-colors"
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-60 text-white font-bold py-3.5 rounded-full transition-all shadow-glow hover:shadow-lg"
                   >
-                    <RotateCcw size={12} /> Reiniciar
+                    {loading
+                      ? <><Loader2 size={16} className="animate-spin" /> Calculando…</>
+                      : <><Sparkles size={16} /> Calcular mi riesgo</>
+                    }
                   </button>
-                )}
-              </form>
+
+                  {result && (
+                    <button type="button" onClick={reset}
+                      className="w-full flex items-center justify-center gap-1.5 text-usb-muted hover:text-usb-text text-xs font-medium mt-2 py-2 transition-colors"
+                    >
+                      <RotateCcw size={12} /> Reiniciar
+                    </button>
+                  )}
+                </form>
+              )}
             </div>
           </div>
 
@@ -659,7 +787,11 @@ export default function Prediccion() {
                   <BarChart2 size={28} className="text-usb-faint" />
                 </div>
                 <p className="font-bold text-usb-text mb-1">Esperando tu análisis</p>
-                <p className="text-usb-muted text-sm">Presiona "Calcular mi riesgo" para obtener tu predicción</p>
+                <p className="text-usb-muted text-sm">
+                  {selectedCourse
+                    ? 'Presiona "Calcular mi riesgo" para obtener tu predicción'
+                    : 'Selecciona una materia para comenzar'}
+                </p>
               </div>
             )}
 
@@ -681,12 +813,17 @@ export default function Prediccion() {
                     initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
                     className="bg-white rounded-2xl shadow-card border border-usb-border p-6"
                   >
-                    <h3 className="font-bold text-usb-text mb-4 flex items-center gap-2">
+                    <h3 className="font-bold text-usb-text mb-5 flex items-center gap-2 text-base">
                       <span className="w-6 h-6 rounded-full bg-ar-cyan/20 text-ar-cyan flex items-center justify-center text-xs font-bold">2</span>
                       Nivel de Riesgo
+                      {selectedCourse && (
+                        <span className="ml-auto text-xs font-normal text-usb-muted bg-usb-canvas border border-usb-border px-2.5 py-1 rounded-full">
+                          {selectedCourse.name}
+                        </span>
+                      )}
                     </h3>
                     <div className="flex flex-col sm:flex-row items-center gap-6">
-                      <div className="w-full max-w-[200px]">
+                      <div className="w-full max-w-[240px]">
                         <GaugeChart pct={result.porcentaje_riesgo} nivel={result.nivel_riesgo} />
                       </div>
                       <div className="flex-1 space-y-3">
@@ -694,9 +831,11 @@ export default function Prediccion() {
                           {riskIcon(result.nivel_riesgo)}
                           Riesgo {result.nivel_riesgo}
                         </div>
-                        <div className="bg-usb-canvas rounded-xl p-3 border border-usb-border">
-                          <p className="text-xs text-usb-muted mb-0.5 font-medium">Probabilidad de aprobar</p>
-                          <p className="text-2xl font-extrabold text-emerald-600">{100 - result.porcentaje_riesgo}%</p>
+                        <div className="bg-usb-canvas rounded-xl p-4 border border-usb-border">
+                          <p className="text-xs text-usb-muted mb-1 font-medium">Probabilidad de aprobar</p>
+                          <p className="text-3xl font-black text-emerald-600 tabular-nums">
+                            {fmt1(100 - result.porcentaje_riesgo)}%
+                          </p>
                         </div>
                         <button
                           onClick={() => setShowMath(true)}
@@ -713,22 +852,22 @@ export default function Prediccion() {
                     initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
                     className="grid sm:grid-cols-2 gap-4"
                   >
-                    <div className="bg-white rounded-2xl shadow-card border border-usb-border p-4">
+                    <div className="bg-white rounded-2xl shadow-card border border-usb-border p-5">
                       <CompareBar
                         title="Asistencia y Plataforma"
                         labels={['Asistencia (%)', 'Inicios Sesión']}
-                        studentVals={[form.asistencia, form.logins]}
+                        studentVals={[finalForm.asistencia, finalForm.logins]}
                         avgVals={[PROMEDIOS_APROBADOS.asistencia, PROMEDIOS_APROBADOS.logins]}
-                        maxY={100} stepY={10}
+                        maxY={100} stepY={20}
                       />
                     </div>
-                    <div className="bg-white rounded-2xl shadow-card border border-usb-border p-4">
+                    <div className="bg-white rounded-2xl shadow-card border border-usb-border p-5">
                       <CompareBar
                         title="Seguimiento y Parcial"
                         labels={['Seguimiento', 'Parcial 1']}
-                        studentVals={[form.seguimiento, form.parcial]}
+                        studentVals={[finalForm.seguimiento, finalForm.parcial]}
                         avgVals={[PROMEDIOS_APROBADOS.seguimiento, PROMEDIOS_APROBADOS.parcial]}
-                        maxY={5} stepY={0.5}
+                        maxY={5} stepY={1}
                       />
                     </div>
                   </motion.div>
@@ -742,8 +881,8 @@ export default function Prediccion() {
                       <Bot size={16} className="text-ar-cyan" />
                       Análisis del Consejero IA
                     </h3>
-                    <div className="bg-usb-canvas rounded-xl p-4 border border-usb-border text-sm text-usb-subtle leading-relaxed whitespace-pre-wrap">
-                      {result.analisis_ia}
+                    <div className="bg-usb-canvas rounded-xl p-4 border border-usb-border">
+                      <MarkdownText text={result.analisis_ia} />
                     </div>
                   </motion.div>
                 </>
@@ -757,10 +896,8 @@ export default function Prediccion() {
         <p className="text-white/30 text-xs">Academic Risk · Predictor Académico IA · Período 2024-I</p>
       </footer>
 
-      {/* Chat bubble — always visible on this page */}
-      <ChatBot result={result} formData={form} />
+      <ChatBot result={result} formData={finalForm} />
 
-      {/* Math modal */}
       <AnimatePresence>
         {showMath && result && <MathModal result={result} onClose={() => setShowMath(false)} />}
       </AnimatePresence>
