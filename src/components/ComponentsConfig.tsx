@@ -1,101 +1,263 @@
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Trash2, CheckCircle2, AlertTriangle } from 'lucide-react'
-import type { GradeComponent } from '../types'
+import { Plus, Trash2, CheckCircle2, AlertTriangle, ChevronDown } from 'lucide-react'
+import type { GradeComponent, GradeCut } from '../types'
 
-interface Props {
-  components: GradeComponent[]
-  onChange: (c: GradeComponent[]) => void
-}
+// Percentage input with its own draft state so the user can clear and retype freely
+function PctInput({
+  value, max, className, onCommit,
+}: { value: number; max: number; className: string; onCommit: (n: number) => void }) {
+  const [draft, setDraft] = useState(String(value))
 
-export default function ComponentsConfig({ components, onChange }: Props) {
-  const total = components.reduce((s, c) => s + c.percentage, 0)
-  const valid = total === 40
-
-  const update = (id: string, field: keyof GradeComponent, val: string | number) =>
-    onChange(components.map(c => c.id === id ? { ...c, [field]: field === 'percentage' ? Number(val) : val } : c))
-
-  const remove = (id: string) => onChange(components.filter(c => c.id !== id))
-
-  const add = () => onChange([...components, {
-    id: `comp-${Date.now()}`,
-    name: 'Nuevo componente',
-    percentage: Math.max(0, 40 - total),
-  }])
-
-  const fillPct = Math.min(100, (total / 40) * 100)
-  const over = total > 40
+  // Keep draft in sync when parent resets the value externally
+  useEffect(() => { setDraft(String(value)) }, [value])
 
   return (
-    <div className="space-y-4">
-      {/* Validation banner */}
-      <div className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm ${
-        valid ? 'bg-risk-low-bg text-risk-low border border-green-200'
-        : over ? 'bg-risk-high-bg text-risk-high border border-red-200'
-        : 'bg-risk-med-bg text-risk-med border border-amber-200'
+    <input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={draft}
+      className={className}
+      onChange={e => {
+        const raw = e.target.value.replace(/[^0-9]/g, '')
+        setDraft(raw)
+        if (raw !== '') onCommit(Math.max(0, Math.min(max, parseInt(raw, 10))))
+      }}
+      onBlur={() => {
+        const n = parseInt(draft, 10)
+        const clamped = isNaN(n) ? 0 : Math.max(0, Math.min(max, n))
+        setDraft(String(clamped))
+        onCommit(clamped)
+      }}
+    />
+  )
+}
+
+interface Props {
+  cuts: GradeCut[]
+  components: GradeComponent[]
+  onChangeCuts: (cuts: GradeCut[]) => void
+  onChange: (components: GradeComponent[]) => void
+}
+
+export default function ComponentsConfig({ cuts, components, onChangeCuts, onChange }: Props) {
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(cuts.map(c => c.id)))
+
+  const cutsTotal = cuts.reduce((s, c) => s + c.percentage, 0)
+  const cutsValid = cutsTotal === 100
+  const allValid  = cutsValid && cuts.every(cut => {
+    const sum = components.filter(c => c.cutId === cut.id).reduce((s, c) => s + c.percentage, 0)
+    return sum === cut.percentage
+  })
+
+  const toggleCut = (id: string) =>
+    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  const updateCutPct = (id: string, n: number) =>
+    onChangeCuts(cuts.map(c => c.id === id ? { ...c, percentage: n } : c))
+
+  const updateCompPct  = (id: string, n: number) =>
+    onChange(components.map(c => c.id === id ? { ...c, percentage: n } : c))
+
+  const updateCompName = (id: string, name: string) =>
+    onChange(components.map(c => c.id === id ? { ...c, name } : c))
+
+  const removeComp = (id: string) => onChange(components.filter(c => c.id !== id))
+
+  const addComp = (cutId: string, cut: GradeCut) => {
+    const cutTotal = components.filter(c => c.cutId === cutId).reduce((s, c) => s + c.percentage, 0)
+    onChange([...components, {
+      id:         `comp-${Date.now()}`,
+      cutId,
+      name:       'Nueva actividad',
+      percentage: Math.max(0, cut.percentage - cutTotal),
+    }])
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Overall status */}
+      <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold border ${
+        allValid
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+          : 'bg-amber-50 border-amber-200 text-amber-700'
       }`}>
-        <div className="flex items-center gap-2 font-semibold">
-          {valid ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
-          {valid ? 'Distribución válida: suma exactamente 40%'
-          : over ? `Excede el límite: ${total}% (máximo 40%)`
-          : `Faltan ${40 - total}% por asignar (total: ${total}/40%)`}
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-28 h-2 bg-white/60 rounded-full overflow-hidden">
-            <motion.div
-              animate={{ width: `${fillPct}%` }}
-              className={`h-full rounded-full ${valid ? 'bg-risk-low' : over ? 'bg-risk-high' : 'bg-risk-med'}`}
-            />
-          </div>
-          <span className="font-bold font-mono text-xs">{total}/40</span>
-        </div>
+        {allValid ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
+        {allValid
+          ? 'Distribución válida — todos los cortes están completos'
+          : !cutsValid
+            ? `Los cortes suman ${cutsTotal}% — deben sumar 100%`
+            : 'Completa la distribución interna de cada corte'}
       </div>
 
-      {/* Components list */}
-      <div className="space-y-2">
-        <AnimatePresence>
-          {components.map((comp) => (
-            <motion.div
-              key={comp.id}
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="flex items-center gap-3 bg-usb-canvas rounded-xl px-4 py-3 border border-usb-border"
+      {/* Cuts summary row */}
+      <div className="grid grid-cols-3 gap-2">
+        {cuts.map(cut => {
+          const cutTotal = components.filter(c => c.cutId === cut.id).reduce((s, c) => s + c.percentage, 0)
+          const valid    = cutTotal === cut.percentage
+          const over     = cutTotal > cut.percentage
+          return (
+            <div
+              key={cut.id}
+              className={`rounded-xl px-3 py-2 border text-center ${
+                valid ? 'bg-emerald-50 border-emerald-200' :
+                over  ? 'bg-rose-50 border-rose-200' :
+                'bg-amber-50 border-amber-200'
+              }`}
             >
-              <div className="w-2 h-8 bg-usb-orange/30 rounded-full" />
-              <input
-                type="text"
-                value={comp.name}
-                onChange={e => update(comp.id, 'name', e.target.value)}
-                className="flex-1 bg-transparent text-[0.85rem] font-medium text-usb-subtle focus:outline-none"
-              />
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  min={0} max={40} step={1}
-                  value={comp.percentage}
-                  onChange={e => update(comp.id, 'percentage', e.target.value)}
-                  className="w-14 text-center font-mono font-bold text-[0.85rem] border border-usb-border rounded-lg py-1 bg-white focus:outline-none focus:border-usb-orange focus:ring-2 focus:ring-usb-orange/20"
-                />
-                <span className="text-usb-muted text-xs font-semibold">%</span>
-              </div>
-              <button
-                onClick={() => remove(comp.id)}
-                className="p-1.5 text-usb-faint hover:text-risk-high hover:bg-risk-high-bg rounded-lg transition-colors"
-              >
-                <Trash2 size={14} />
-              </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+              <p className="text-[0.68rem] font-bold uppercase tracking-wider text-usb-muted">{cut.name}</p>
+              <p className={`text-lg font-extrabold ${valid ? 'text-emerald-700' : over ? 'text-rose-600' : 'text-amber-700'}`}>
+                {cut.percentage}%
+              </p>
+              <p className="text-[0.65rem] text-usb-faint">{cutTotal}/{cut.percentage} asignado</p>
+            </div>
+          )
+        })}
       </div>
 
-      <button
-        onClick={add}
-        className="flex items-center gap-2 text-sm font-semibold text-usb-orange hover:text-usb-orange-hover border-2 border-dashed border-usb-orange/30 hover:border-usb-orange/60 rounded-xl px-4 py-3 w-full justify-center transition-all"
-      >
-        <Plus size={15} />
-        Agregar componente de evaluación
-      </button>
+      {/* Cut sections */}
+      {cuts.map((cut, ci) => {
+        const cutComps = components.filter(c => c.cutId === cut.id)
+        const cutTotal = cutComps.reduce((s, c) => s + c.percentage, 0)
+        const cutValid = cutTotal === cut.percentage
+        const cutOver  = cutTotal > cut.percentage
+        const fillPct  = cut.percentage > 0 ? Math.min(100, (cutTotal / cut.percentage) * 100) : 0
+        const isOpen   = expanded.has(cut.id)
+
+        return (
+          <div key={cut.id} className="border border-usb-border rounded-2xl overflow-hidden bg-white">
+            {/* Header */}
+            <button
+              onClick={() => toggleCut(cut.id)}
+              className="w-full flex items-center justify-between px-5 py-4 hover:bg-usb-canvas/60 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-extrabold flex-shrink-0 ${
+                  cutValid ? 'bg-emerald-100 text-emerald-700' :
+                  cutOver  ? 'bg-rose-100 text-rose-700' :
+                  'bg-amber-100 text-amber-700'
+                }`}>
+                  {ci + 1 === cuts.length ? 'F' : ci + 1}
+                </div>
+                <div>
+                  <p className="font-extrabold text-sm text-usb-text">{cut.name}</p>
+                  <p className="text-[0.7rem] text-usb-muted">{cutComps.length} actividad{cutComps.length !== 1 ? 'es' : ''}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Editable cut weight */}
+                <div
+                  className="flex items-center gap-1"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <PctInput
+                    value={cut.percentage}
+                    max={100}
+                    onCommit={n => updateCutPct(cut.id, n)}
+                    className="w-14 text-center font-mono font-bold text-sm border border-usb-border rounded-lg py-1 bg-usb-canvas focus:outline-none focus:border-green-accent focus:ring-2 focus:ring-green-accent/20"
+                  />
+                  <span className="text-usb-muted text-xs font-semibold">%</span>
+                </div>
+
+                {/* Per-cut fill bar */}
+                <div className="hidden sm:flex items-center gap-1.5 w-28">
+                  <div className="flex-1 h-1.5 bg-usb-canvas rounded-full overflow-hidden border border-usb-border">
+                    <motion.div
+                      animate={{ width: `${fillPct}%` }}
+                      transition={{ duration: 0.4 }}
+                      className={`h-full rounded-full ${cutValid ? 'bg-emerald-500' : cutOver ? 'bg-rose-500' : 'bg-amber-400'}`}
+                    />
+                  </div>
+                  <span className={`text-[0.68rem] font-bold font-mono w-12 text-right ${
+                    cutValid ? 'text-emerald-600' : cutOver ? 'text-rose-600' : 'text-amber-600'
+                  }`}>
+                    {cutTotal}/{cut.percentage}
+                  </span>
+                </div>
+
+                <ChevronDown
+                  size={15}
+                  className={`text-usb-faint transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                />
+              </div>
+            </button>
+
+            {/* Body */}
+            <AnimatePresence initial={false}>
+              {isOpen && (
+                <motion.div
+                  key="body"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22 }}
+                  className="overflow-hidden border-t border-usb-border"
+                >
+                  <div className="p-4 space-y-2" style={{ background: 'var(--canvas-warm, #f9f6f1)' }}>
+                    <AnimatePresence>
+                      {cutComps.map(comp => (
+                        <motion.div
+                          key={comp.id}
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-usb-border"
+                        >
+                          <div className="w-1.5 h-6 rounded-full flex-shrink-0" style={{ background: 'var(--green-accent, #00754A)', opacity: 0.4 }} />
+                          <input
+                            type="text"
+                            value={comp.name}
+                            onChange={e => updateCompName(comp.id, e.target.value)}
+                            className="flex-1 bg-transparent text-[0.85rem] font-medium text-usb-subtle focus:outline-none"
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <PctInput
+                              value={comp.percentage}
+                              max={cut.percentage}
+                              onCommit={n => updateCompPct(comp.id, n)}
+                              className="w-14 text-center font-mono font-bold text-[0.85rem] border border-usb-border rounded-lg py-1 bg-white focus:outline-none focus:border-green-accent focus:ring-2 focus:ring-green-accent/20"
+                            />
+                            <span className="text-usb-muted text-xs font-semibold">%</span>
+                          </div>
+                          <button
+                            onClick={() => removeComp(comp.id)}
+                            className="p-1.5 text-usb-faint hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+
+                    {cutComps.length === 0 && (
+                      <p className="text-center text-xs text-usb-faint py-2">
+                        Sin actividades — agrega al menos una
+                      </p>
+                    )}
+
+                    <button
+                      onClick={() => addComp(cut.id, cut)}
+                      disabled={cutTotal >= cut.percentage}
+                      className="flex items-center gap-2 text-sm font-semibold border-2 border-dashed rounded-xl px-4 py-2.5 w-full justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      style={{
+                        color:       cutTotal >= cut.percentage ? 'var(--text-faint)' : 'var(--green-accent, #00754A)',
+                        borderColor: cutTotal >= cut.percentage ? 'rgba(0,0,0,0.12)' : 'rgba(0,117,74,0.35)',
+                      }}
+                    >
+                      <Plus size={14} />
+                      {cutTotal >= cut.percentage
+                        ? `${cut.name} completo (${cut.percentage}%)`
+                        : `Agregar actividad · quedan ${cut.percentage - cutTotal}%`}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )
+      })}
     </div>
   )
 }

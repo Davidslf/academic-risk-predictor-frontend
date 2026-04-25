@@ -10,8 +10,8 @@ import { useState, useEffect } from 'react'
  *   "?" button can re-trigger the tour from anywhere.
  * - Marks the tour as seen in localStorage when finished or skipped.
  */
-export function useTour(key: string) {
-  const storageKey = `ar-tour-${key}`
+export function useTour(key: string, userId?: string) {
+  const storageKey = userId ? `ar-tour-${userId}-${key}` : `ar-tour-${key}`
   const [run, setRun] = useState(false)
 
   useEffect(() => {

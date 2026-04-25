@@ -121,10 +121,10 @@ export default function EstadisticasProfesor() {
       <Header />
 
       {/* Page header */}
-      <div className="bg-ar-navy border-b border-white/10 px-5 py-5">
+      <div className="border-b border-white/10 px-5 py-5" style={{ background: 'var(--green-deep)' }}>
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center gap-2 mb-1">
-            <BarChart2 size={18} className="text-ar-cyan" />
+            <BarChart2 size={18} style={{ color: 'var(--green-light)' }} />
             <h1 className="text-white font-extrabold text-xl">Estadísticas</h1>
           </div>
           <p className="text-white/50 text-sm">
@@ -137,7 +137,7 @@ export default function EstadisticasProfesor() {
         {/* Loading */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 size={32} className="text-ar-cyan animate-spin mb-4" />
+            <Loader2 size={32} className="animate-spin mb-4" style={{ color: 'var(--green-accent)' }} />
             <p className="text-usb-muted text-sm font-medium">Cargando estadísticas…</p>
           </div>
         )}
@@ -149,7 +149,7 @@ export default function EstadisticasProfesor() {
             <p className="font-bold text-usb-text mb-2">{error}</p>
             <button
               onClick={fetchData}
-              className="text-ar-cyan text-sm font-bold hover:underline"
+              className="text-sm font-bold hover:underline" style={{ color: 'var(--green-accent)' }}
             >
               Reintentar
             </button>
@@ -161,10 +161,10 @@ export default function EstadisticasProfesor() {
             {/* Global stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {[
-                { icon: BookOpen,   label: 'Materias',              value: coursesData.length,  color: 'text-ar-cyan',     bg: 'bg-ar-cyan/10' },
-                { icon: Users,      label: 'Estudiantes (total)',   value: totalUnique,         color: 'text-violet-500',  bg: 'bg-violet-50' },
-                { icon: Layers,     label: 'Programas',             value: programStats.length, color: 'text-amber-500',   bg: 'bg-amber-50' },
-                { icon: TrendingUp, label: 'Prom. por materia',     value: coursesData.length > 0 ? Math.round(coursesData.reduce((s, c) => s + c.students.length, 0) / coursesData.length) : 0, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                { icon: BookOpen,   label: 'Materias',            value: coursesData.length,  iconColor: 'var(--green-accent)', iconBg: 'rgba(0,117,74,0.09)' },
+                { icon: Users,      label: 'Estudiantes (total)', value: totalUnique,         iconColor: 'var(--green-brand)',  iconBg: 'rgba(0,98,65,0.07)'  },
+                { icon: Layers,     label: 'Programas',           value: programStats.length, iconColor: 'var(--gold)',         iconBg: 'var(--gold-lightest)' },
+                { icon: TrendingUp, label: 'Prom. por materia',   value: coursesData.length > 0 ? Math.round(coursesData.reduce((s, c) => s + c.students.length, 0) / coursesData.length) : 0, iconColor: 'var(--green-accent)', iconBg: 'rgba(0,117,74,0.09)' },
               ].map((stat, i) => (
                 <motion.div
                   key={stat.label}
@@ -173,8 +173,11 @@ export default function EstadisticasProfesor() {
                   transition={{ delay: i * 0.08 }}
                   className="bg-white rounded-2xl p-4 shadow-card border border-usb-border flex items-center gap-3"
                 >
-                  <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center`}>
-                    <stat.icon size={18} className={stat.color} />
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: stat.iconBg }}
+                  >
+                    <stat.icon size={18} style={{ color: stat.iconColor }} />
                   </div>
                   <div>
                     <p className="text-[0.68rem] font-bold uppercase tracking-wider text-usb-muted">{stat.label}</p>
@@ -202,8 +205,8 @@ export default function EstadisticasProfesor() {
                       className="bg-white rounded-2xl p-5 border border-usb-border shadow-card"
                     >
                       <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center">
-                          <Layers size={18} className="text-violet-500" />
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(0,117,74,0.09)' }}>
+                          <Layers size={18} style={{ color: 'var(--green-accent)' }} />
                         </div>
                         <div className="min-w-0 flex-1">
                           <h4 className="font-bold text-usb-text text-sm truncate">
@@ -215,7 +218,7 @@ export default function EstadisticasProfesor() {
                       <div className="space-y-2 mb-3">
                         <div className="flex justify-between text-xs">
                           <span className="text-usb-muted">Estudiantes únicos</span>
-                          <span className="font-bold text-violet-600">{ps.uniqueStudents}</span>
+                          <span className="font-bold" style={{ color: 'var(--green-accent)' }}>{ps.uniqueStudents}</span>
                         </div>
                         <div className="flex justify-between text-xs">
                           <span className="text-usb-muted">Inscripciones totales</span>
@@ -223,7 +226,7 @@ export default function EstadisticasProfesor() {
                         </div>
                         <div className="flex justify-between text-xs">
                           <span className="text-usb-muted">Materias</span>
-                          <span className="font-bold text-ar-cyan">{ps.courses.length}</span>
+                          <span className="font-bold" style={{ color: 'var(--green-brand)' }}>{ps.courses.length}</span>
                         </div>
                       </div>
 
@@ -233,7 +236,7 @@ export default function EstadisticasProfesor() {
                           initial={{ width: 0 }}
                           animate={{ width: `${barPct}%` }}
                           transition={{ duration: 0.6, delay: i * 0.05 + 0.2 }}
-                          className="h-full bg-violet-400 rounded-full"
+                          className="h-full rounded-full" style={{ background: 'var(--green-accent)' }}
                         />
                       </div>
                     </motion.div>
@@ -293,12 +296,12 @@ export default function EstadisticasProfesor() {
                                 <p className="font-semibold text-usb-text">{cws.course.name}</p>
                               </td>
                               <td className="px-4 py-3 text-center">
-                                <span className="inline-block bg-ar-cyan/10 text-ar-cyan text-[0.68rem] font-bold px-2 py-0.5 rounded-full">
+                                <span className="inline-block text-[0.68rem] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,117,74,0.09)', color: 'var(--green-accent)' }}>
                                   {cws.course.code}
                                 </span>
                               </td>
                               <td className="px-4 py-3">
-                                <span className="text-xs font-medium text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,98,65,0.07)', color: 'var(--green-brand)' }}>
                                   {cws.programName}
                                 </span>
                               </td>
@@ -315,7 +318,7 @@ export default function EstadisticasProfesor() {
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-center">
-                                <span className="inline-flex items-center gap-1 font-bold text-violet-600">
+                                <span className="inline-flex items-center gap-1 font-bold" style={{ color: 'var(--green-accent)' }}>
                                   <Users size={13} />
                                   {cws.students.length}
                                 </span>
@@ -327,7 +330,7 @@ export default function EstadisticasProfesor() {
                                       initial={{ width: 0 }}
                                       animate={{ width: `${pct}%` }}
                                       transition={{ duration: 0.5, delay: i * 0.03 + 0.3 }}
-                                      className="h-full bg-ar-cyan rounded-full"
+                                      className="h-full rounded-full" style={{ background: 'var(--green-accent)' }}
                                     />
                                   </div>
                                 </div>
@@ -351,7 +354,7 @@ export default function EstadisticasProfesor() {
         )}
       </main>
 
-      <footer className="bg-ar-navy border-t border-white/10 py-4 text-center">
+      <footer className="border-t border-white/10 py-4 text-center" style={{ background: 'var(--green-deep)' }}>
         <p className="text-white/30 text-xs">Academic Risk · Estadísticas del Docente</p>
       </footer>
     </div>

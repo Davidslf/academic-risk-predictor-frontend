@@ -21,10 +21,17 @@ export interface Professor {
   avatar?: string
 }
 
+export interface GradeCut {
+  id: string
+  name: string         // "Corte 1", "Corte 2", "Corte Final"
+  percentage: number   // absolute, all cuts must sum to 100
+}
+
 export interface GradeComponent {
   id: string
+  cutId?: string       // which GradeCut this belongs to
   name: string
-  percentage: number
+  percentage: number   // absolute % out of 100
 }
 
 export interface Student {
@@ -49,11 +56,34 @@ export interface Course {
   professorId: string
   semester: string
   studentIds: string[]
+  cuts: GradeCut[]
   components: GradeComponent[]
   program?: string
 }
 
 export type RiskLevel = 'high' | 'medium' | 'low' | null
+
+export type ReferralType =
+  | 'bajo_rendimiento'
+  | 'riesgo_desercion'
+  | 'inasistencia'
+  | 'problemas_personales'
+  | 'otro'
+
+export type ReferralAttendance = 'si' | 'no' | 'sin_confirmar'
+
+export interface Referral {
+  id:                   string
+  studentId:            string
+  courseId:             string
+  professorId:          string
+  type:                 ReferralType
+  observations:         string
+  referralObservations: string
+  date:                 string   // YYYY-MM-DD
+  attended:             ReferralAttendance
+  createdAt:            string   // ISO
+}
 
 export interface University {
   id: string

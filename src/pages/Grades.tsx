@@ -17,6 +17,7 @@ interface Props {
   lastSaved: Date | null
   onUpdateGrade: (studentId: string, componentId: string, value: number | null) => void
   onUpdateComponents: (courseId: string, components: Course['components']) => void
+  onUpdateCuts: (courseId: string, cuts: Course['cuts']) => void
   onBack: () => void
   onLogout: () => void
 }
@@ -25,12 +26,14 @@ type Tab = 'grades' | 'config'
 
 export default function GradesPage({
   course, grades, lastSaved,
-  onUpdateGrade, onUpdateComponents, onBack,
+  onUpdateGrade, onUpdateComponents, onUpdateCuts, onBack,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('grades')
   const [showImport, setShowImport] = useState(false)
   const { user } = useAuth()
-  const totalPct = course.components.reduce((s, c) => s + c.percentage, 0)
+  const totalPct  = course.components.reduce((s, c) => s + c.percentage, 0)
+  const cutsTotal = (course.cuts ?? []).reduce((s, c) => s + c.percentage, 0)
+  const allValid  = totalPct === 100 && cutsTotal === 100
   const { atRiskCount, completionPct, courseStudents } = useGradeCalculation(course, grades, students)
   const toast = useToast()
 
@@ -60,26 +63,34 @@ export default function GradesPage({
         <div className="flex items-center gap-2">
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 text-usb-muted hover:text-ar-cyan transition-colors font-medium"
+            className="flex items-center gap-1.5 text-usb-muted transition-colors font-medium"
+            style={{ ['--tw-hover-color' as string]: 'var(--green-accent)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--green-accent)')}
+            onMouseLeave={e => (e.currentTarget.style.color = '')}
           >
             <ChevronLeft size={14} />
             <span className="text-xs">Mis materias</span>
           </button>
           <span className="text-usb-border">/</span>
-          <span className="text-xs font-bold text-ar-cyan">{course.name}</span>
+          <span className="text-xs font-bold" style={{ color: 'var(--green-accent)' }}>{course.name}</span>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowImport(true)}
-            className="flex items-center gap-1.5 text-xs font-bold text-white bg-ar-cyan hover:bg-ar-cyan-dark px-3.5 py-1.5 rounded-full transition-all shadow-sm"
+            className="flex items-center gap-1.5 text-xs font-bold text-white px-3.5 py-1.5 rounded-full transition-all shadow-sm"
+            style={{ background: 'var(--green-accent)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--green-brand)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--green-accent)')}
           >
             <Upload size={12} />
             Importar notas
           </button>
           <button
             onClick={() => toast.info('Exportación', 'Disponible en versión con backend conectado.')}
-            className="flex items-center gap-1.5 text-xs font-semibold text-usb-muted hover:text-ar-cyan border border-usb-border hover:border-ar-cyan rounded-full px-3 py-1.5 transition-all"
+            className="flex items-center gap-1.5 text-xs font-semibold text-usb-muted border border-usb-border rounded-full px-3 py-1.5 transition-all"
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--green-accent)'; e.currentTarget.style.borderColor = 'var(--green-accent)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = ''; e.currentTarget.style.borderColor = '' }}
           >
             <Download size={12} />
             Exportar
@@ -97,7 +108,7 @@ export default function GradesPage({
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 bg-ar-cyan/10 text-ar-cyan text-[0.65rem] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">
+                <span className="inline-flex items-center gap-1.5 text-[0.65rem] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,117,74,0.10)', color: 'var(--green-accent)' }}>
                   <FileSpreadsheet size={10} />
                   {course.code} · {course.group}
                 </span>
@@ -119,7 +130,7 @@ export default function GradesPage({
               </div>
               <div className="w-px h-8 bg-usb-border" />
               <div className="text-center">
-                <p className="text-xl font-extrabold text-ar-cyan">{completionPct}%</p>
+                <p className="text-xl font-extrabold" style={{ color: 'var(--green-accent)' }}>{completionPct}%</p>
                 <p className="text-[0.65rem] font-bold uppercase tracking-wider text-usb-muted">Avance</p>
               </div>
               <div className="w-px h-8 bg-usb-border" />
@@ -147,14 +158,15 @@ export default function GradesPage({
           <div className="mt-4 pt-4 border-t border-usb-border">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[0.68rem] font-bold uppercase tracking-wider text-usb-muted">Progreso de ingreso</span>
-              <span className="text-[0.75rem] font-extrabold text-ar-cyan">{completionPct}%</span>
+              <span className="text-[0.75rem] font-extrabold" style={{ color: 'var(--green-accent)' }}>{completionPct}%</span>
             </div>
             <div className="h-2 bg-usb-canvas rounded-full overflow-hidden border border-usb-border">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${completionPct}%` }}
                 transition={{ duration: 0.8, ease: 'easeOut' }}
-                className="h-full bg-ar-cyan rounded-full"
+                className="h-full rounded-full"
+                style={{ background: 'var(--green-accent)' }}
               />
             </div>
           </div>
@@ -164,16 +176,17 @@ export default function GradesPage({
         <div className="flex gap-1 bg-white border border-usb-border rounded-2xl p-1 w-fit mb-4">
           {[
             { key: 'grades', label: 'Calificaciones' },
-            { key: 'config', label: `Distribución 40% (${totalPct}/40)`, warn: totalPct !== 40 },
+            { key: 'config', label: `Distribución de notas (${totalPct}/100%)`, warn: !allValid },
           ].map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as Tab)}
               className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-sm font-bold transition-all ${
                 activeTab === tab.key
-                  ? 'bg-ar-cyan text-white shadow-sm'
+                  ? 'text-white shadow-sm'
                   : 'text-usb-muted hover:text-usb-text'
               }`}
+              style={activeTab === tab.key ? { background: 'var(--green-accent)' } : {}}
             >
               {tab.label}
               {tab.warn && (
@@ -197,11 +210,13 @@ export default function GradesPage({
           {activeTab === 'config' && (
             <div className="p-5">
               <p className="text-sm text-usb-muted mb-4">
-                Define cómo se distribuye el <span className="font-bold text-ar-cyan">40%</span> del primer corte.
-                La suma debe ser exactamente 40%.
+                Define los cortes y sus actividades. Cada corte tiene un peso porcentual y sus actividades
+                deben sumar exactamente ese porcentaje. El total de los tres cortes debe ser <span className="font-bold" style={{ color: 'var(--green-accent)' }}>100%</span>.
               </p>
               <ComponentsConfig
+                cuts={course.cuts ?? []}
                 components={course.components}
+                onChangeCuts={cuts => onUpdateCuts(course.id, cuts)}
                 onChange={comps => onUpdateComponents(course.id, comps)}
               />
             </div>
@@ -211,7 +226,7 @@ export default function GradesPage({
 
       <footer className="bg-white border-t border-usb-border px-5 py-3 text-center">
         <p className="text-xs text-usb-faint">
-          Academic Risk · Portal de Calificaciones · Modo Demostración · 2024-I
+          Academic Risk · Portal de Calificaciones · 2024-I
         </p>
       </footer>
 

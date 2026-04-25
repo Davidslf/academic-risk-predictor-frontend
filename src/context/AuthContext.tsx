@@ -6,6 +6,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import type { AuthUser, UserRole } from '../types'
 import { authService } from '../services/authService'
+import { userService } from '../services/userService'
 import { tokenStore } from '../services/api'
 
 // ─── Context shape ────────────────────────────────────────────────────────────
@@ -13,7 +14,7 @@ import { tokenStore } from '../services/api'
 interface AuthContextValue {
   user:     AuthUser | null
   loading:  boolean
-  login:    (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  login:    (email: string, password: string) => Promise<{ success: boolean; error?: string; firstName?: string; userId?: string }>
   logout:   () => void
 }
 
@@ -52,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (
     email: string,
     password: string,
-  ): Promise<{ success: boolean; error?: string }> => {
+  ): Promise<{ success: boolean; error?: string; firstName?: string; userId?: string }> => {
     setLoading(true)
     try {
       const tokens  = await authService.login(email.trim(), password)
@@ -65,19 +66,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const role = ROLE_MAP[payload.role as string] ?? 'student'
 
+      // Try to get the real full_name from the backend profile.
+      // The JWT may only contain sub + role (no full_name claim).
+      const userId = payload.sub as string
+      let fullName: string = (payload.full_name as string | undefined) ?? ''
+      try {
+        const profile = await userService.getById(userId)
+        if (profile?.full_name) fullName = profile.full_name
+      } catch { /* silently fall back to JWT claim */ }
+
+      // Last resort: derive a readable name from the email local-part
+      if (!fullName || fullName.includes('@')) {
+        fullName = email.split('@')[0].replace(/[._+]/g, ' ').trim()
+      }
+
+      // Extract just the first name for greeting purposes
+      const firstName = fullName.split(/\s+/)[0] ?? fullName
+
       const authUser: AuthUser = {
-        id:       payload.sub as string,
+        id:       userId,
         role,
-        name:     (payload.full_name as string) ?? email,
+        name:     fullName,
         username: email.trim(),
         email:    email.trim(),
         // Set role-specific ID fields
-        ...(role === 'professor' ? { professorId: payload.sub as string } : {}),
-        ...(role === 'student'   ? { studentId:   payload.sub as string } : {}),
+        ...(role === 'professor' ? { professorId: userId } : {}),
+        ...(role === 'student'   ? { studentId:   userId } : {}),
       }
 
       setUser(authUser)
-      return { success: true }
+      return { success: true, firstName, userId }
     } catch (err: unknown) {
       tokenStore.clearTokens()
       // Return error message for the login page to handle
