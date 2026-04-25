@@ -8,7 +8,7 @@ import {
   createContext, useContext, useState, useEffect, useRef,
   useCallback, type ReactNode,
 } from 'react'
-import type { Course, Grade, GradeComponent } from '../types'
+import type { Course, Grade, GradeComponent, GradeCut } from '../types'
 import { courseService, type BackendCourse } from '../services/courseService'
 import { programService } from '../services/programService'
 
@@ -21,18 +21,27 @@ interface GradesContextValue {
   setSelectedCourseId:(id: string | null) => void
   updateGrade:        (studentId: string, componentId: string, value: number | null) => void
   updateComponents:   (courseId: string, components: Course['components']) => void
+  updateCuts:         (courseId: string, cuts: GradeCut[]) => void
   refreshCourses:     (professorId: string) => Promise<void>
   clearCourses:       () => void
 }
 
 const GradesContext = createContext<GradesContextValue | null>(null)
 
-// ─── Default grade components ─────────────────────────────────────────────────
+// ─── Default cuts + components ────────────────────────────────────────────────
+function defaultCuts(courseId: string): GradeCut[] {
+  return [
+    { id: `${courseId}-cut1`, name: 'Corte 1',     percentage: 30 },
+    { id: `${courseId}-cut2`, name: 'Corte 2',     percentage: 30 },
+    { id: `${courseId}-cut3`, name: 'Corte Final', percentage: 40 },
+  ]
+}
+
 function defaultComponents(courseId: string): GradeComponent[] {
   return [
-    { id: `${courseId}-p1`, name: 'Parcial 1', percentage: 30 },
-    { id: `${courseId}-p2`, name: 'Parcial 2', percentage: 30 },
-    { id: `${courseId}-pf`, name: 'Final',     percentage: 40 },
+    { id: `${courseId}-p1`, cutId: `${courseId}-cut1`, name: 'Parcial 1', percentage: 30 },
+    { id: `${courseId}-p2`, cutId: `${courseId}-cut2`, name: 'Parcial 2', percentage: 30 },
+    { id: `${courseId}-pf`, cutId: `${courseId}-cut3`, name: 'Final',     percentage: 40 },
   ]
 }
 
@@ -51,6 +60,7 @@ function backendToFrontend(
     professorId,
     semester:   bc.academic_period ?? '2025-I',
     studentIds,
+    cuts:       defaultCuts(bc.id),
     components: defaultComponents(bc.id),
     program:    programName ?? bc.program_id,
   }
@@ -155,6 +165,12 @@ export function GradesProvider({ children }: { children: ReactNode }) {
     )
   }
 
+  const updateCuts = (courseId: string, cuts: GradeCut[]) => {
+    setCourseList(prev =>
+      prev.map(c => c.id === courseId ? { ...c, cuts } : c),
+    )
+  }
+
   return (
     <GradesContext.Provider
       value={{
@@ -166,6 +182,7 @@ export function GradesProvider({ children }: { children: ReactNode }) {
         setSelectedCourseId,
         updateGrade,
         updateComponents,
+        updateCuts,
         refreshCourses,
         clearCourses,
       }}

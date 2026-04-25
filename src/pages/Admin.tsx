@@ -10,6 +10,7 @@ import {
   Building2, BookOpen, Users, BookMarked,
   Plus, X, LogOut, ShieldCheck, GraduationCap,
   Loader2, ChevronDown, ChevronUp, AlertCircle, Search,
+  Pencil, Eye, Clock, History, CheckCircle2, XCircle,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -19,7 +20,7 @@ import type { BackendUniversity, BackendProgram, BackendCampus } from '../servic
 import { courseService } from '../services/courseService'
 import type { BackendCourse } from '../services/courseService'
 import { userService } from '../services/userService'
-import type { UserRole } from '../services/userService'
+import type { UserRole, AuditLogEntry, UserUpdatePayload } from '../services/userService'
 import type { BackendUser } from '../services/authService'
 import { notificationService } from '../services/notificationService'
 import { friendlyError } from '../services/errorMessages'
@@ -28,6 +29,7 @@ import { useAuth } from '../context/AuthContext'
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
+// 'universidades' tab is hidden for now — code preserved for future feature
 type Tab = 'universidades' | 'programas' | 'materias' | 'usuarios'
 
 const DEGREE_TYPES = ['PREG', 'POST', 'TEC'] as const
@@ -40,7 +42,7 @@ const DEGREE_LABELS: Record<DegreeType, string> = {
 }
 
 const DEGREE_COLORS: Record<DegreeType, string> = {
-  PREG: 'bg-ar-cyan/10 text-ar-cyan',
+  PREG: 'bg-green-accent/10 text-green-accent',
   POST: 'bg-violet-50 text-violet-600',
   TEC:  'bg-amber-50 text-amber-600',
 }
@@ -51,22 +53,25 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN:     'Admin',
 }
 
-const ROLE_COLORS: Record<string, string> = {
-  STUDENT:   'bg-ar-cyan/10 text-ar-cyan',
-  PROFESSOR: 'bg-violet-50 text-violet-600',
-  ADMIN:     'bg-rose-50 text-rose-600',
+const ROLE_BADGE_STYLE: Record<string, React.CSSProperties> = {
+  STUDENT:   { background: 'rgba(0,117,74,0.12)', color: '#00754A' },
+  PROFESSOR: { background: 'rgba(124,58,237,0.10)', color: '#7c3aed' },
+  ADMIN:     { background: 'rgba(220,38,38,0.10)', color: '#dc2626' },
 }
 
-function Badge({ label, colorClass }: { label: string; colorClass: string }) {
+function Badge({ label, colorClass, style }: { label: string; colorClass?: string; style?: React.CSSProperties }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-bold ${colorClass}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-bold ${colorClass ?? ''}`}
+      style={style}
+    >
       {label}
     </span>
   )
 }
 
 function Spinner({ size = 20 }: { size?: number }) {
-  return <Loader2 size={size} className="animate-spin text-ar-cyan" />
+  return <Loader2 size={size} className="animate-spin text-green-accent" />
 }
 
 function EmptyState({ icon: Icon, message }: { icon: React.ElementType; message: string }) {
@@ -92,10 +97,10 @@ function ErrorBanner({ message }: { message: string }) {
 // ─── Input / Select shared styles ────────────────────────────────────────────
 
 const inputClass =
-  'w-full bg-usb-canvas border border-usb-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-ar-cyan focus:ring-2 focus:ring-ar-cyan/20 transition-all'
+  'w-full bg-usb-canvas border border-usb-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-green-accent focus:ring-2 focus:ring-green-accent/20 transition-all'
 
 const selectClass =
-  'w-full bg-usb-canvas border border-usb-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-ar-cyan focus:ring-2 focus:ring-ar-cyan/20 transition-all appearance-none'
+  'w-full bg-usb-canvas border border-usb-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-green-accent focus:ring-2 focus:ring-green-accent/20 transition-all appearance-none'
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -108,12 +113,13 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 // ─── Modal wrapper ────────────────────────────────────────────────────────────
 
 function Modal({
-  title, icon: Icon, onClose, children,
+  title, icon: Icon, onClose, children, footer,
 }: {
-  title: string
-  icon:  React.ElementType
-  onClose: () => void
+  title:    string
+  icon:     React.ElementType
+  onClose:  () => void
   children: React.ReactNode
+  footer?:  React.ReactNode
 }) {
   return (
     <motion.div
@@ -129,11 +135,11 @@ function Modal({
         onClick={e => e.stopPropagation()}
         className="bg-white rounded-3xl shadow-modal w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col"
       >
-        {/* Header */}
-        <div className="bg-ar-navy px-6 py-5 flex items-center justify-between flex-shrink-0">
+        {/* Header — always visible */}
+        <div className="px-6 py-5 flex items-center justify-between flex-shrink-0" style={{ background: 'var(--green-deep)' }}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-ar-cyan/20 border border-ar-cyan/30 flex items-center justify-center">
-              <Icon size={18} className="text-ar-cyan" />
+            <div className="w-9 h-9 rounded-xl bg-green-accent/20 border border-green-accent/30 flex items-center justify-center">
+              <Icon size={18} className="text-green-accent" />
             </div>
             <h2 className="text-white font-bold text-base">{title}</h2>
           </div>
@@ -141,7 +147,16 @@ function Modal({
             <X size={18} />
           </button>
         </div>
+
+        {/* Scrollable body */}
         <div className="overflow-y-auto flex-1">{children}</div>
+
+        {/* Footer — always visible, outside scroll area */}
+        {footer && (
+          <div className="flex-shrink-0 px-6 py-4 border-t border-usb-border bg-white">
+            {footer}
+          </div>
+        )}
       </motion.div>
     </motion.div>
   )
@@ -174,8 +189,24 @@ function CreateUniversityModal({ onClose, onCreated }: { onClose: () => void; on
     }
   }
 
+  const footer = (
+    <div className="flex gap-3">
+      <button onClick={onClose} className="flex-1 py-3 rounded-full border border-usb-border text-usb-muted hover:text-usb-text font-semibold text-sm transition-all">
+        Cancelar
+      </button>
+      <button
+        onClick={handleSave}
+        disabled={!canSave || saving}
+        className="flex-1 py-3 rounded-full text-white text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed" style={{ background: '#00754A' }}
+      >
+        {saving ? <Spinner size={16} /> : null}
+        Guardar
+      </button>
+    </div>
+  )
+
   return (
-    <Modal title="Nueva Universidad" icon={Building2} onClose={onClose}>
+    <Modal title="Nueva Universidad" icon={Building2} onClose={onClose} footer={footer}>
       <div className="p-6 space-y-4">
         <div>
           <FieldLabel required>Nombre de la universidad</FieldLabel>
@@ -192,19 +223,6 @@ function CreateUniversityModal({ onClose, onCreated }: { onClose: () => void; on
         <div>
           <FieldLabel required>País</FieldLabel>
           <input className={inputClass} value={country} onChange={e => setCountry(e.target.value)} placeholder="Ej: Colombia" />
-        </div>
-        <div className="flex gap-3 pt-2">
-          <button onClick={onClose} className="flex-1 py-3 rounded-full border border-usb-border text-usb-muted hover:text-usb-text font-semibold text-sm transition-all">
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!canSave || saving}
-            className="flex-1 py-3 rounded-full bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-all flex items-center justify-center gap-2"
-          >
-            {saving ? <Spinner size={16} /> : null}
-            Guardar
-          </button>
         </div>
       </div>
     </Modal>
@@ -248,14 +266,14 @@ function UniversidadesTab() {
         <h2 className="text-xl font-extrabold text-usb-text">
           Universidades
           {universities.length > 0 && (
-            <span className="ml-2 text-xs font-bold bg-ar-cyan/10 text-ar-cyan px-2 py-0.5 rounded-full">
+            <span className="ml-2 text-xs font-bold bg-green-accent/10 text-green-accent px-2 py-0.5 rounded-full">
               {universities.length}
             </span>
           )}
         </h2>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-ar-cyan hover:bg-ar-cyan-dark text-white font-bold rounded-full px-5 py-2.5 text-sm transition-all"
+          className="flex items-center gap-2 bg-green-accent hover:bg-green-brand text-white font-bold rounded-full px-5 py-2.5 text-sm transition-all"
         >
           <Plus size={15} /> Nueva Universidad
         </button>
@@ -320,61 +338,29 @@ function UniversidadesTab() {
 
 // ─── Tab: Programas ───────────────────────────────────────────────────────────
 
-function CreateProgramModal({
-  universities, selectedUniId, onClose, onCreated,
-}: {
-  universities: BackendUniversity[]
-  selectedUniId: string
-  onClose: () => void
-  onCreated: () => void
-}) {
+function CreateProgramModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const toast = useToast()
-  const [uniId, setUniId]               = useState(selectedUniId)
-  const [campuses, setCampuses]         = useState<BackendCampus[]>([])
-  const [campusId, setCampusId]         = useState('')
   const [programCode, setProgramCode]   = useState('')
   const [programName, setProgramName]   = useState('')
   const [degreeType, setDegreeType]     = useState<DegreeType>('PREG')
   const [institution, setInstitution]   = useState('')
   const [sniesCode, setSniesCode]       = useState('')
   const [location, setLocation]         = useState('')
-  const [academicGroup, setAcademicGroup] = useState('')
-  const [loadingCampuses, setLoadingCampuses] = useState(false)
   const [saving, setSaving]             = useState(false)
 
-  const loadCampuses = useCallback(async (id: string) => {
-    if (!id) return
-    setLoadingCampuses(true)
-    setCampusId('')
-    try {
-      const data = await programService.listCampusesByUniversity(id)
-      setCampuses(data)
-      if (data.length === 1) setCampusId(data[0].id)
-    } catch (err) {
-      toast.error('Error al cargar sedes', friendlyError(err))
-    } finally {
-      setLoadingCampuses(false)
-    }
-  }, [toast])
-
-  useEffect(() => { if (uniId) void loadCampuses(uniId) }, [uniId, loadCampuses])
-
-  const canSave = uniId && campusId && programCode.trim() && programName.trim() && institution.trim() && sniesCode.trim()
+  const canSave = programCode.trim() && programName.trim() && institution.trim() && sniesCode.trim()
 
   const handleSave = async () => {
     if (!canSave) return
     setSaving(true)
     try {
       await programService.createProgram({
-        campus_id:      campusId,
-        institution:    institution.trim(),
-        degree_type:    degreeType,
-        program_code:   programCode.trim(),
-        program_name:   programName.trim(),
-        pensum:         '',
-        academic_group: academicGroup.trim(),
-        location:       location.trim(),
-        snies_code:     Number(sniesCode),
+        institution:  institution.trim(),
+        degree_type:  degreeType,
+        program_code: programCode.trim(),
+        program_name: programName.trim(),
+        location:     location.trim(),
+        snies_code:   Number(sniesCode),
       })
       toast.success('Programa creado', programName.trim())
       onCreated()
@@ -386,50 +372,29 @@ function CreateProgramModal({
     }
   }
 
+  const footer = (
+    <div className="flex gap-3">
+      <button onClick={onClose} className="flex-1 py-3 rounded-full border border-usb-border text-usb-muted hover:text-usb-text font-semibold text-sm transition-all">
+        Cancelar
+      </button>
+      <button
+        onClick={handleSave}
+        disabled={!canSave || saving}
+        className="flex-1 py-3 rounded-full text-white text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed" style={{ background: '#00754A' }}
+      >
+        {saving ? <Spinner size={16} /> : null}
+        Guardar
+      </button>
+    </div>
+  )
+
   return (
-    <Modal title="Nuevo Programa" icon={BookOpen} onClose={onClose}>
+    <Modal title="Nuevo Programa" icon={BookOpen} onClose={onClose} footer={footer}>
       <div className="p-6 space-y-4">
-        {/* University selector */}
-        <div>
-          <FieldLabel required>Universidad</FieldLabel>
-          <div className="relative">
-            <select
-              className={selectClass}
-              value={uniId}
-              onChange={e => setUniId(e.target.value)}
-            >
-              <option value="">Selecciona universidad…</option>
-              {universities.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-usb-faint pointer-events-none" />
-          </div>
-        </div>
-
-        {/* Campus selector */}
-        <div>
-          <FieldLabel required>Sede</FieldLabel>
-          {loadingCampuses ? (
-            <div className="flex items-center gap-2 py-3 text-usb-muted text-sm"><Spinner size={15} /> Cargando sedes…</div>
-          ) : (
-            <div className="relative">
-              <select
-                className={selectClass}
-                value={campusId}
-                onChange={e => setCampusId(e.target.value)}
-                disabled={!uniId || campuses.length === 0}
-              >
-                <option value="">{!uniId ? 'Primero elige universidad' : campuses.length === 0 ? 'Sin sedes disponibles' : 'Selecciona sede…'}</option>
-                {campuses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-usb-faint pointer-events-none" />
-            </div>
-          )}
-        </div>
-
         <div className="grid grid-cols-2 gap-3">
           <div>
             <FieldLabel required>Código</FieldLabel>
-            <input className={inputClass} value={programCode} onChange={e => setProgramCode(e.target.value)} placeholder="Ej: ING-SIS" />
+            <input className={inputClass} value={programCode} onChange={e => setProgramCode(e.target.value)} placeholder="Ej: ING-SIS" autoFocus />
           </div>
           <div>
             <FieldLabel required>Tipo</FieldLabel>
@@ -441,17 +406,14 @@ function CreateProgramModal({
             </div>
           </div>
         </div>
-
         <div>
           <FieldLabel required>Nombre del programa</FieldLabel>
           <input className={inputClass} value={programName} onChange={e => setProgramName(e.target.value)} placeholder="Ej: Ingeniería de Sistemas" />
         </div>
-
         <div>
           <FieldLabel required>Institución</FieldLabel>
           <input className={inputClass} value={institution} onChange={e => setInstitution(e.target.value)} placeholder="Ej: Facultad de Ingeniería" />
         </div>
-
         <div className="grid grid-cols-2 gap-3">
           <div>
             <FieldLabel required>Código SNIES</FieldLabel>
@@ -462,69 +424,31 @@ function CreateProgramModal({
             <input className={inputClass} value={location} onChange={e => setLocation(e.target.value)} placeholder="Ej: Bogotá" />
           </div>
         </div>
-
-        <div>
-          <FieldLabel>Grupo académico</FieldLabel>
-          <input className={inputClass} value={academicGroup} onChange={e => setAcademicGroup(e.target.value)} placeholder="Ej: CIENCIAS" />
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <button onClick={onClose} className="flex-1 py-3 rounded-full border border-usb-border text-usb-muted hover:text-usb-text font-semibold text-sm transition-all">
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!canSave || saving}
-            className="flex-1 py-3 rounded-full bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-all flex items-center justify-center gap-2"
-          >
-            {saving ? <Spinner size={16} /> : null}
-            Guardar
-          </button>
-        </div>
       </div>
     </Modal>
   )
 }
 
 function ProgramasTab() {
-  const toast = useToast()
-  const [universities, setUniversities] = useState<BackendUniversity[]>([])
-  const [selectedUniId, setSelectedUniId] = useState('')
-  const [programs, setPrograms]         = useState<BackendProgram[]>([])
-  const [loadingUnis, setLoadingUnis]   = useState(true)
-  const [loadingPrograms, setLoadingPrograms] = useState(false)
-  const [error, setError]               = useState('')
-  const [showModal, setShowModal]       = useState(false)
+  const [programs, setPrograms]   = useState<BackendProgram[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState('')
+  const [showModal, setShowModal] = useState(false)
 
-  // Load universities once
-  useEffect(() => {
-    let cancelled = false
-    setLoadingUnis(true)
-    programService.listUniversities()
-      .then(res => { if (!cancelled) setUniversities(res.data) })
-      .catch(() => { /* universities load silently — user can still see selector */ })
-      .finally(() => { if (!cancelled) setLoadingUnis(false) })
-    return () => { cancelled = true }
-  }, [])
-
-  const loadPrograms = useCallback(async (uniId: string) => {
-    if (!uniId) { setPrograms([]); return }
-    setLoadingPrograms(true)
+  const load = useCallback(async () => {
+    setLoading(true)
     setError('')
     try {
-      const res = await programService.listProgramsByUniversity(uniId)
-      setPrograms(res.data)
+      const data = await programService.listAll()
+      setPrograms(data)
     } catch (err) {
       setError(friendlyError(err))
     } finally {
-      setLoadingPrograms(false)
+      setLoading(false)
     }
   }, [])
 
-  const handleUniChange = (id: string) => {
-    setSelectedUniId(id)
-    void loadPrograms(id)
-  }
+  useEffect(() => { void load() }, [load])
 
   return (
     <div className="space-y-4">
@@ -532,53 +456,31 @@ function ProgramasTab() {
         <h2 className="text-xl font-extrabold text-usb-text">
           Programas
           {programs.length > 0 && (
-            <span className="ml-2 text-xs font-bold bg-ar-cyan/10 text-ar-cyan px-2 py-0.5 rounded-full">
+            <span className="ml-2 text-xs font-bold bg-green-accent/10 text-green-accent px-2 py-0.5 rounded-full">
               {programs.length}
             </span>
           )}
         </h2>
         <button
           onClick={() => setShowModal(true)}
-          disabled={!selectedUniId}
-          className="flex items-center gap-2 bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-full px-5 py-2.5 text-sm transition-all"
+          className="flex items-center gap-2 bg-green-accent hover:bg-green-brand text-white font-bold rounded-full px-5 py-2.5 text-sm transition-all"
         >
           <Plus size={15} /> Nuevo Programa
         </button>
       </div>
 
-      {/* University selector */}
-      <div className="max-w-xs relative">
-        {loadingUnis ? (
-          <div className="flex items-center gap-2 text-sm text-usb-muted py-2"><Spinner size={15} /> Cargando universidades…</div>
-        ) : (
-          <>
-            <select
-              className={selectClass}
-              value={selectedUniId}
-              onChange={e => handleUniChange(e.target.value)}
-            >
-              <option value="">Selecciona una universidad…</option>
-              {universities.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-usb-faint pointer-events-none" />
-          </>
-        )}
-      </div>
-
       {error && <ErrorBanner message={error} />}
 
-      {!selectedUniId ? (
-        <EmptyState icon={BookOpen} message="Selecciona una universidad para ver sus programas." />
-      ) : loadingPrograms ? (
+      {loading ? (
         <div className="flex justify-center py-16"><Spinner size={28} /></div>
-      ) : programs.length === 0 ? (
-        <EmptyState icon={BookOpen} message="Esta universidad no tiene programas registrados." />
+      ) : programs.length === 0 && !error ? (
+        <EmptyState icon={BookOpen} message="No hay programas registrados. Crea el primero." />
       ) : (
         <div className="bg-white rounded-2xl border border-usb-border overflow-hidden shadow-card">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-usb-border bg-usb-canvas">
-                {['Programa', 'Código', 'Tipo', 'Institución', 'SNIES'].map(h => (
+                {['Programa', 'Código', 'Tipo', 'Institución', 'SNIES', 'Ubicación'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-[0.68rem] font-bold uppercase tracking-wider text-usb-muted">{h}</th>
                 ))}
               </tr>
@@ -602,6 +504,7 @@ function ProgramasTab() {
                   </td>
                   <td className="px-4 py-3 text-usb-muted">{prog.institution}</td>
                   <td className="px-4 py-3 text-usb-faint text-xs">{prog.snies_code}</td>
+                  <td className="px-4 py-3 text-usb-faint text-xs">{prog.location || '—'}</td>
                 </motion.tr>
               ))}
             </tbody>
@@ -610,12 +513,10 @@ function ProgramasTab() {
       )}
 
       <AnimatePresence>
-        {showModal && selectedUniId && (
+        {showModal && (
           <CreateProgramModal
-            universities={universities}
-            selectedUniId={selectedUniId}
             onClose={() => setShowModal(false)}
-            onCreated={() => void loadPrograms(selectedUniId)}
+            onCreated={load}
           />
         )}
       </AnimatePresence>
@@ -662,8 +563,24 @@ function CreateCourseModal({
     }
   }
 
+  const footer = (
+    <div className="flex gap-3">
+      <button onClick={onClose} className="flex-1 py-3 rounded-full border border-usb-border text-usb-muted hover:text-usb-text font-semibold text-sm transition-all">
+        Cancelar
+      </button>
+      <button
+        onClick={handleSave}
+        disabled={!canSave || saving}
+        className="flex-1 py-3 rounded-full text-white text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed" style={{ background: '#00754A' }}
+      >
+        {saving ? <Spinner size={16} /> : null}
+        Guardar
+      </button>
+    </div>
+  )
+
   return (
-    <Modal title="Nueva Materia" icon={BookMarked} onClose={onClose}>
+    <Modal title="Nueva Materia" icon={BookMarked} onClose={onClose} footer={footer}>
       <div className="p-6 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -683,65 +600,29 @@ function CreateCourseModal({
           <FieldLabel required>Período académico</FieldLabel>
           <input className={inputClass} value={academicPeriod} onChange={e => setAcademicPeriod(e.target.value)} placeholder="Ej: 2025-I" />
         </div>
-        <div className="flex gap-3 pt-2">
-          <button onClick={onClose} className="flex-1 py-3 rounded-full border border-usb-border text-usb-muted hover:text-usb-text font-semibold text-sm transition-all">
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!canSave || saving}
-            className="flex-1 py-3 rounded-full bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-all flex items-center justify-center gap-2"
-          >
-            {saving ? <Spinner size={16} /> : null}
-            Guardar
-          </button>
-        </div>
       </div>
     </Modal>
   )
 }
 
 function MateriasTab() {
-  const toast = useToast()
-  const [universities, setUniversities] = useState<BackendUniversity[]>([])
-  const [selectedUniId, setSelectedUniId] = useState('')
-  const [programs, setPrograms]         = useState<BackendProgram[]>([])
+  const [programs, setPrograms]             = useState<BackendProgram[]>([])
   const [selectedProgramId, setSelectedProgramId] = useState('')
-  const [courses, setCourses]           = useState<BackendCourse[]>([])
-  const [loadingUnis, setLoadingUnis]   = useState(true)
-  const [loadingPrograms, setLoadingPrograms] = useState(false)
+  const [courses, setCourses]               = useState<BackendCourse[]>([])
+  const [loadingPrograms, setLoadingPrograms] = useState(true)
   const [loadingCourses, setLoadingCourses] = useState(false)
-  const [error, setError]               = useState('')
-  const [showModal, setShowModal]       = useState(false)
+  const [error, setError]                   = useState('')
+  const [showModal, setShowModal]           = useState(false)
 
-  // Load universities
+  // Load all programs for the selector
   useEffect(() => {
     let cancelled = false
-    setLoadingUnis(true)
-    programService.listUniversities()
-      .then(res => { if (!cancelled) setUniversities(res.data) })
-      .catch(() => { /* selector-only load, errors surface via handleUniChange */ })
-      .finally(() => { if (!cancelled) setLoadingUnis(false) })
+    programService.listAll()
+      .then(data => { if (!cancelled) setPrograms(data) })
+      .catch(() => { /* silently ignore — user sees empty selector */ })
+      .finally(() => { if (!cancelled) setLoadingPrograms(false) })
     return () => { cancelled = true }
   }, [])
-
-  const handleUniChange = async (id: string) => {
-    setSelectedUniId(id)
-    setSelectedProgramId('')
-    setPrograms([])
-    setCourses([])
-    if (!id) return
-    setLoadingPrograms(true)
-    setError('')
-    try {
-      const res = await programService.listProgramsByUniversity(id)
-      setPrograms(res.data)
-    } catch (err) {
-      setError(friendlyError(err))
-    } finally {
-      setLoadingPrograms(false)
-    }
-  }
 
   const loadCourses = useCallback(async (programId: string) => {
     if (!programId) { setCourses([]); return }
@@ -768,7 +649,7 @@ function MateriasTab() {
         <h2 className="text-xl font-extrabold text-usb-text">
           Materias
           {courses.length > 0 && (
-            <span className="ml-2 text-xs font-bold bg-ar-cyan/10 text-ar-cyan px-2 py-0.5 rounded-full">
+            <span className="ml-2 text-xs font-bold bg-green-accent/10 text-green-accent px-2 py-0.5 rounded-full">
               {courses.length}
             </span>
           )}
@@ -776,52 +657,35 @@ function MateriasTab() {
         <button
           onClick={() => setShowModal(true)}
           disabled={!selectedProgramId}
-          className="flex items-center gap-2 bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-full px-5 py-2.5 text-sm transition-all"
+          className="flex items-center gap-2 bg-green-accent hover:bg-green-brand disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-full px-5 py-2.5 text-sm transition-all"
         >
           <Plus size={15} /> Nueva Materia
         </button>
       </div>
 
-      {/* Selectors row */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          {loadingUnis ? (
-            <div className="flex items-center gap-2 text-sm text-usb-muted py-2"><Spinner size={15} /> Cargando…</div>
-          ) : (
-            <>
-              <select className={selectClass} value={selectedUniId} onChange={e => void handleUniChange(e.target.value)}>
-                <option value="">Universidad…</option>
-                {universities.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-usb-faint pointer-events-none" />
-            </>
-          )}
-        </div>
-
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          {loadingPrograms ? (
-            <div className="flex items-center gap-2 text-sm text-usb-muted py-2"><Spinner size={15} /> Cargando programas…</div>
-          ) : (
-            <>
-              <select
-                className={selectClass}
-                value={selectedProgramId}
-                onChange={e => handleProgramChange(e.target.value)}
-                disabled={!selectedUniId || programs.length === 0}
-              >
-                <option value="">{!selectedUniId ? 'Primero elige universidad' : 'Programa…'}</option>
-                {programs.map(p => <option key={p.id} value={p.id}>{p.program_name}</option>)}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-usb-faint pointer-events-none" />
-            </>
-          )}
-        </div>
+      {/* Program selector */}
+      <div className="relative max-w-sm">
+        {loadingPrograms ? (
+          <div className="flex items-center gap-2 text-sm text-usb-muted py-2"><Spinner size={15} /> Cargando programas…</div>
+        ) : (
+          <>
+            <select
+              className={selectClass}
+              value={selectedProgramId}
+              onChange={e => handleProgramChange(e.target.value)}
+            >
+              <option value="">Selecciona un programa…</option>
+              {programs.map(p => <option key={p.id} value={p.id}>{p.program_name}</option>)}
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-usb-faint pointer-events-none" />
+          </>
+        )}
       </div>
 
       {error && <ErrorBanner message={error} />}
 
       {!selectedProgramId ? (
-        <EmptyState icon={BookMarked} message="Selecciona una universidad y un programa para ver sus materias." />
+        <EmptyState icon={BookMarked} message="Selecciona un programa para ver sus materias." />
       ) : loadingCourses ? (
         <div className="flex justify-center py-16"><Spinner size={28} /></div>
       ) : courses.length === 0 ? (
@@ -869,9 +733,449 @@ function MateriasTab() {
   )
 }
 
+// ─── EditUserModal ────────────────────────────────────────────────────────────
+
+function EditUserModal({
+  user: u, onClose, onSaved,
+}: {
+  user:    BackendUser
+  onClose: () => void
+  onSaved: (updated: BackendUser) => void
+}) {
+  const toast = useToast()
+  const [fullName, setFullName] = useState(u.full_name)
+  const [role, setRole]         = useState<UserRole>(u.role)
+  const [password, setPassword] = useState('')
+  const [saving, setSaving]     = useState(false)
+
+  const isDirty = fullName.trim() !== u.full_name || role !== u.role || password.length > 0
+
+  const handleSave = async () => {
+    if (!fullName.trim()) { toast.warning('Campo requerido', 'El nombre no puede estar vacío.'); return }
+    if (password && password.length < 8) { toast.warning('Contraseña débil', 'Mínimo 8 caracteres.'); return }
+    setSaving(true)
+    try {
+      const payload: UserUpdatePayload = {}
+      if (fullName.trim() !== u.full_name) payload.full_name = fullName.trim()
+      if (role !== u.role) payload.role = role
+      if (password) payload.password = password
+
+      const updated = await userService.update(u.id, payload)
+      toast.success('Usuario actualizado', `${updated.full_name} ha sido modificado.`)
+      onSaved(updated)
+      onClose()
+    } catch (err) {
+      toast.error('Error al actualizar', friendlyError(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const canSaveEdit = isDirty && (!password || password.length >= 8) && !saving
+
+  const footer = (
+    <div className="flex gap-3">
+      <button
+        onClick={onClose}
+        className="flex-1 py-3 rounded-full border border-usb-border text-usb-muted hover:text-usb-text font-semibold text-sm transition-all"
+      >
+        Cancelar
+      </button>
+      <button
+        onClick={canSaveEdit ? handleSave : undefined}
+        style={{
+          background: canSaveEdit ? '#00754A' : '#d1d5db',
+          cursor: canSaveEdit ? 'pointer' : 'not-allowed',
+        }}
+        className="flex-1 py-3 rounded-full text-white text-sm font-bold transition-all flex items-center justify-center gap-2"
+      >
+        {saving ? <Spinner size={16} /> : null}
+        Guardar cambios
+      </button>
+    </div>
+  )
+
+  return (
+    <Modal title="Editar Usuario" icon={Pencil} onClose={onClose} footer={footer}>
+      <div className="p-6 space-y-4">
+        <div>
+          <FieldLabel required>Nombre completo</FieldLabel>
+          <input
+            className={inputClass}
+            value={fullName}
+            onChange={e => setFullName(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <div>
+          <FieldLabel>Rol</FieldLabel>
+          <div className="relative">
+            <select className={selectClass} value={role} onChange={e => setRole(e.target.value as UserRole)}>
+              <option value="STUDENT">Estudiante</option>
+              <option value="PROFESSOR">Docente</option>
+              <option value="ADMIN">Administrador</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-usb-faint pointer-events-none" />
+          </div>
+        </div>
+        <div>
+          <FieldLabel>Nueva contraseña <span className="text-usb-faint font-normal normal-case tracking-normal">(opcional)</span></FieldLabel>
+          <input
+            className={inputClass}
+            type="password"
+            // onInput captures password-manager autofill (bypasses React onChange)
+            onInput={e => setPassword((e.target as HTMLInputElement).value)}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Dejar vacío para mantener la actual"
+            autoComplete="new-password"
+          />
+          {password && password.length < 8 && (
+            <p className="flex items-center gap-1.5 text-rose-500 text-xs mt-1.5">
+              <AlertCircle size={12} /> Mínimo 8 caracteres.
+            </p>
+          )}
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ─── UserDetailDrawer ─────────────────────────────────────────────────────────
+
+const OP_LABELS: Record<string, string> = {
+  INSERT: 'Creación',
+  UPDATE: 'Actualización',
+  DELETE: 'Eliminación',
+}
+
+// Human-readable field names for the audit log (avoids exposing DB column names)
+const FIELD_LABELS: Record<string, string> = {
+  full_name:           'Nombre completo',
+  email:               'Correo electrónico',
+  institutional_email: 'Correo institucional',
+  role:                'Rol',
+  status:              'Estado',
+  password_hash:       'Contraseña',
+  ml_consent:          'Consentimiento ML',
+  last_login:          'Último inicio de sesión',
+  created_at:          'Fecha de creación',
+  updated_at:          'Última actualización',
+}
+
+const ROLE_READABLE: Record<string, string> = {
+  STUDENT:   'Estudiante',
+  PROFESSOR: 'Docente',
+  ADMIN:     'Administrador',
+}
+
+const STATUS_READABLE: Record<string, string> = {
+  ACTIVE:   'Activo',
+  INACTIVE: 'Inactivo',
+}
+
+// Fields to show in the audit log — anything NOT in this set is hidden (internal/technical)
+const AUDITABLE_FIELDS = new Set(Object.keys(FIELD_LABELS))
+
+// Fields that change automatically or can't be meaningfully diffed — excluded from diffs
+const AUTO_FIELDS = new Set(['updated_at', 'created_at', 'last_login', 'password_hash'])
+
+// Normalize a value for comparison — handles Python str() booleans ("True"/"False") vs JSON booleans
+function normalizeForCompare(v: unknown): string {
+  if (v === null || v === undefined) return ''
+  const s = String(v).trim()
+  const lower = s.toLowerCase()
+  if (lower === 'true') return 'true'
+  if (lower === 'false') return 'false'
+  return s
+}
+
+function formatFieldValue(key: string, value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—'
+  if (key === 'role') return ROLE_READABLE[String(value)] ?? String(value)
+  if (key === 'status') return STATUS_READABLE[String(value)] ?? String(value)
+  if (key === 'ml_consent') return value ? 'Sí' : 'No'
+  if (key === 'password_hash') return '••••••••'
+  if (typeof value === 'boolean') return value ? 'Sí' : 'No'
+  // Format ISO date strings (handles both "T" and space separator, e.g. "2026-04-21 01:09:30+00:00")
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value)) {
+    try {
+      return new Date(value.replace(' ', 'T')).toLocaleString('es-CO', {
+        day: 'numeric', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      })
+    } catch { /* fall through */ }
+  }
+  return String(value)
+}
+
+const OP_COLORS: Record<string, string> = {
+  INSERT: 'bg-emerald-50 text-emerald-700',
+  UPDATE: 'bg-amber-50 text-amber-700',
+  DELETE: 'bg-rose-50 text-rose-600',
+}
+
+function UserDetailDrawer({ user: u, onClose, onStatusChange }: {
+  user:           BackendUser
+  onClose:        () => void
+  onStatusChange: (updated: BackendUser) => void
+}) {
+  const toast = useToast()
+  const [history, setHistory] = useState<AuditLogEntry[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(true)
+  const [togglingStatus, setTogglingStatus] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    userService.getHistory(u.id)
+      .then(h => { if (!cancelled) setHistory(h) })
+      .catch(() => { /* silently fail */ })
+      .finally(() => { if (!cancelled) setLoadingHistory(false) })
+    return () => { cancelled = true }
+  }, [u.id])
+
+  const handleToggleStatus = async () => {
+    const newStatus = u.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
+    setTogglingStatus(true)
+    try {
+      const updated = await userService.updateStatus(u.id, newStatus)
+      toast.success(
+        newStatus === 'ACTIVE' ? 'Usuario activado' : 'Usuario desactivado',
+        updated.full_name,
+      )
+      onStatusChange(updated)
+    } catch (err) {
+      toast.error('Error al cambiar estado', friendlyError(err))
+    } finally {
+      setTogglingStatus(false)
+    }
+  }
+
+  const formatDate = (iso: string | null) => {
+    if (!iso) return 'Nunca'
+    return new Date(iso).toLocaleString('es-CO', {
+      day: 'numeric', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    })
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
+        transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+        onClick={e => e.stopPropagation()}
+        className="bg-white rounded-3xl shadow-modal w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden"
+      >
+        {/* Header */}
+        <div className="px-6 py-5 flex items-center gap-3 flex-shrink-0" style={{ background: 'var(--green-deep)' }}>
+          <div className="w-10 h-10 rounded-full bg-green-accent/20 border border-green-accent/30 flex items-center justify-center text-green-accent font-extrabold text-sm flex-shrink-0">
+            {u.full_name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-white font-bold text-base leading-tight truncate">{u.full_name}</h2>
+            <p className="text-white/50 text-xs truncate">{u.email}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-colors"
+            style={{ background: 'rgba(255,255,255,0.18)', color: '#fff' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.30)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.18)')}
+            aria-label="Cerrar"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-6 space-y-6">
+          {/* Quick stats */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-usb-canvas rounded-2xl p-3 text-center border border-usb-border">
+              <p className="text-[0.62rem] font-bold uppercase tracking-wider text-usb-muted mb-1">Rol</p>
+              <Badge label={ROLE_LABELS[u.role] ?? u.role} style={ROLE_BADGE_STYLE[u.role] ?? { background: 'var(--canvas-warm)', color: 'rgba(0,0,0,0.58)' }} />
+            </div>
+            <div className="bg-usb-canvas rounded-2xl p-3 text-center border border-usb-border">
+              <p className="text-[0.62rem] font-bold uppercase tracking-wider text-usb-muted mb-1">Estado</p>
+              <Badge
+                label={u.status === 'ACTIVE' ? 'Activo' : 'Inactivo'}
+                colorClass={u.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'}
+              />
+            </div>
+            <div className="bg-usb-canvas rounded-2xl p-3 text-center border border-usb-border">
+              <p className="text-[0.62rem] font-bold uppercase tracking-wider text-usb-muted mb-1">ML</p>
+              <Badge
+                label={u.ml_consent ? 'Sí' : 'No'}
+                colorClass={u.ml_consent ? 'bg-emerald-50 text-emerald-700' : 'bg-usb-canvas text-usb-muted'}
+              />
+            </div>
+          </div>
+
+          {/* Last login */}
+          <div className="flex items-center gap-3 bg-usb-canvas rounded-2xl px-4 py-3 border border-usb-border">
+            <Clock size={16} className="text-green-accent flex-shrink-0" />
+            <div>
+              <p className="text-[0.65rem] font-bold uppercase tracking-wider text-usb-muted">Último inicio de sesión</p>
+              <p className="text-sm font-semibold text-usb-text">{formatDate(u.last_login ?? null)}</p>
+            </div>
+          </div>
+
+          {/* Toggle status */}
+          <button
+            onClick={handleToggleStatus}
+            disabled={togglingStatus}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all border ${
+              u.status === 'ACTIVE'
+                ? 'border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+            } disabled:opacity-50`}
+          >
+            {togglingStatus
+              ? <Spinner size={14} />
+              : u.status === 'ACTIVE'
+                ? <><XCircle size={14} /> Desactivar usuario</>
+                : <><CheckCircle2 size={14} /> Activar usuario</>
+            }
+          </button>
+
+          {/* Audit history — collapsible */}
+          <div>
+            <button
+              onClick={() => setHistoryOpen(v => !v)}
+              className="w-full flex items-center justify-between gap-2 py-2 px-3 rounded-xl hover:bg-usb-canvas transition-colors border border-usb-border"
+            >
+              <div className="flex items-center gap-2">
+                <History size={14} className="text-usb-muted" />
+                <span className="text-xs font-bold uppercase tracking-wider text-usb-muted">Historial de cambios</span>
+                {!loadingHistory && history.length > 0 && (
+                  <span className="text-[0.65rem] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(0,117,74,0.10)', color: 'var(--green-accent, #00754A)' }}>
+                    {history.length}
+                  </span>
+                )}
+              </div>
+              <ChevronDown size={14} className={`text-usb-faint transition-transform duration-200 ${historyOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <AnimatePresence initial={false}>
+            {historyOpen && (
+              <motion.div
+                key="history"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22 }}
+                className="overflow-hidden"
+              >
+            <div className="mt-3">
+            {loadingHistory ? (
+              <div className="flex justify-center py-6"><Spinner size={20} /></div>
+            ) : history.length === 0 ? (
+              <p className="text-center text-usb-faint text-sm py-4">Sin historial de cambios.</p>
+            ) : (
+              <div className="space-y-2">
+                {history.map(entry => (
+                  <div
+                    key={entry.id}
+                    className="bg-usb-canvas rounded-xl border border-usb-border px-4 py-3 text-xs"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Badge
+                        label={OP_LABELS[entry.operation] ?? entry.operation}
+                        colorClass={OP_COLORS[entry.operation] ?? 'bg-usb-canvas text-usb-muted'}
+                      />
+                      <span className="text-usb-faint">
+                        {new Date(entry.timestamp).toLocaleString('es-CO', {
+                          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    {entry.changed_by_name && (
+                      <p className="text-usb-muted">
+                        Por: <span className="font-semibold text-usb-text">{entry.changed_by_name}</span>
+                      </p>
+                    )}
+                    {(() => {
+                      const newData  = entry.new_data  ?? {}
+                      const prevData = entry.previous_data ?? {}
+                      const isInsert = entry.operation === 'INSERT'
+
+                      // Backend stores all fields in both new_data and previous_data.
+                      // Show only fields where the value actually changed, normalizing types.
+                      const hasPrevData = Object.keys(prevData).length > 0
+
+                      const visibleEntries = Object.entries(newData).filter(([k, v]) => {
+                        if (!AUDITABLE_FIELDS.has(k) || AUTO_FIELDS.has(k)) return false
+                        if (isInsert) return v !== null && v !== undefined && v !== ''
+                        // Only show if value actually differs from previous
+                        if (!hasPrevData) return false
+                        return normalizeForCompare(v) !== normalizeForCompare(prevData[k])
+                      })
+
+                      if (visibleEntries.length === 0) {
+                        return (
+                          <p className="mt-1.5 text-usb-faint text-[0.65rem] italic">
+                            {isInsert ? null : 'Sin detalles de campos modificados.'}
+                          </p>
+                        )
+                      }
+
+                      return (
+                        <div className="mt-1.5 space-y-0.5">
+                          {visibleEntries.map(([k, v]) => {
+                            const prevVal = prevData[k]
+                            const newStr  = formatFieldValue(k, v)
+                            const prevStr = formatFieldValue(k, prevVal)
+                            return (
+                              <p key={k} className="text-usb-faint">
+                                <span className="font-semibold text-usb-muted">{FIELD_LABELS[k]}:</span>
+                                {!isInsert && prevVal !== undefined && prevStr !== '—' && (
+                                  <span className="mx-1 line-through text-rose-300">{prevStr}</span>
+                                )}
+                                <span className="mx-1 text-emerald-600 font-semibold">→ {newStr}</span>
+                              </p>
+                            )
+                          })}
+                          {/* prevOnlyKeys placeholder — intentionally empty, kept for future use */}
+                          {([] as string[]).map(k => (
+                            <p key={k} className="text-usb-faint">
+                              <span className="font-semibold text-usb-muted">{FIELD_LABELS[k]}:</span>
+                              <span className="mx-1 text-emerald-600 font-semibold">→ {formatFieldValue(k, prevData[k])}</span>
+                            </p>
+                          ))}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                ))}
+              </div>
+            )}
+            </div>
+            </motion.div>
+            )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 // ─── User row with reminder action ───────────────────────────────────────────
 
-function UserRow({ user: u, index: i }: { user: BackendUser; index: number }) {
+function UserRow({
+  user: u, index: i, onEdit, onDetail,
+}: {
+  user:     BackendUser
+  index:    number
+  onEdit:   (user: BackendUser) => void
+  onDetail: (user: BackendUser) => void
+}) {
   const toast = useToast()
   const [sending, setSending] = useState(false)
 
@@ -903,7 +1207,7 @@ function UserRow({ user: u, index: i }: { user: BackendUser; index: number }) {
       <td className="px-4 py-3">
         <Badge
           label={ROLE_LABELS[u.role] ?? u.role}
-          colorClass={ROLE_COLORS[u.role] ?? 'bg-usb-canvas text-usb-muted'}
+          style={ROLE_BADGE_STYLE[u.role] ?? { background: 'var(--canvas-warm)', color: 'rgba(0,0,0,0.58)' }}
         />
       </td>
       <td className="px-4 py-3">
@@ -916,17 +1220,36 @@ function UserRow({ user: u, index: i }: { user: BackendUser; index: number }) {
         {new Date(u.created_at).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
       </td>
       <td className="px-4 py-3">
-        {u.role === 'STUDENT' && (
+        <div className="flex items-center gap-1">
           <button
-            onClick={handleSendReminder}
-            disabled={sending}
-            title="Enviar recordatorio del predictor"
-            className="flex items-center gap-1.5 text-xs font-semibold text-ar-cyan hover:text-ar-cyan-dark disabled:opacity-40 transition-colors px-2 py-1 rounded-lg hover:bg-ar-cyan/10"
+            onClick={() => onDetail(u)}
+            title="Ver detalles"
+            className="p-1.5 text-usb-muted hover:text-green-accent hover:bg-green-accent/10 rounded-lg transition-colors"
           >
-            {sending ? <Loader2 size={12} className="animate-spin" /> : <GraduationCap size={12} />}
-            Recordatorio
+            <Eye size={13} />
           </button>
-        )}
+          <button
+            onClick={() => onEdit(u)}
+            title="Editar usuario"
+            className="p-1.5 text-usb-muted hover:text-green-accent hover:bg-green-accent/10 rounded-lg transition-colors"
+          >
+            <Pencil size={13} />
+          </button>
+          {u.role === 'STUDENT' && (
+            <button
+              onClick={handleSendReminder}
+              disabled={sending}
+              title="Enviar recordatorio del predictor"
+              className="flex items-center gap-1 text-xs font-semibold disabled:opacity-40 transition-colors px-2 py-1 rounded-lg"
+              style={{ color: '#00754A' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,117,74,0.10)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '' }}
+            >
+              {sending ? <Loader2 size={12} className="animate-spin" /> : <GraduationCap size={12} />}
+              <span className="hidden sm:inline">Recordatorio</span>
+            </button>
+          )}
+        </div>
       </td>
     </motion.tr>
   )
@@ -997,15 +1320,36 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
       toast.success('Usuario creado exitosamente', `${fullName.trim()} ha sido registrado.`)
       onCreated()
       onClose()
-    } catch (err) {
-      toast.error('Error al crear usuario', friendlyError(err))
+    } catch (err: unknown) {
+      // 409 = email ya registrado
+      if (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 409) {
+        setEmailError('Este correo ya está registrado en el sistema.')
+      } else {
+        toast.error('Error al crear usuario', friendlyError(err))
+      }
     } finally {
       setSaving(false)
     }
   }
 
+  const footer = (
+    <div className="flex gap-3">
+      <button onClick={onClose} className="flex-1 py-3 rounded-full border border-usb-border text-usb-muted hover:text-usb-text font-semibold text-sm transition-all">
+        Cancelar
+      </button>
+      <button
+        onClick={handleSave}
+        disabled={!canSave || saving}
+        className="flex-1 py-3 rounded-full text-white text-sm font-bold transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed" style={{ background: '#00754A' }}
+      >
+        {saving ? <Spinner size={16} /> : null}
+        Crear usuario
+      </button>
+    </div>
+  )
+
   return (
-    <Modal title="Nuevo Usuario" icon={Users} onClose={onClose}>
+    <Modal title="Nuevo Usuario" icon={Users} onClose={onClose} footer={footer}>
       <div className="p-6 space-y-4">
         <div>
           <FieldLabel required>Nombre completo</FieldLabel>
@@ -1072,42 +1416,41 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
             <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-usb-faint pointer-events-none" />
           </div>
         </div>
-        <div className="flex gap-3 pt-2">
-          <button onClick={onClose} className="flex-1 py-3 rounded-full border border-usb-border text-usb-muted hover:text-usb-text font-semibold text-sm transition-all">
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!canSave || saving}
-            className="flex-1 py-3 rounded-full bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-all flex items-center justify-center gap-2"
-          >
-            {saving ? <Spinner size={16} /> : null}
-            Crear usuario
-          </button>
-        </div>
       </div>
     </Modal>
   )
 }
 
 function UsuariosTab() {
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL')
-  const [users, setUsers]           = useState<BackendUser[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [error, setError]           = useState('')
-  const [showModal, setShowModal]   = useState(false)
-  const [search, setSearch]         = useState('')
-  const [sortCol, setSortCol]       = useState<'full_name' | 'email' | 'role' | 'status' | 'created_at'>('full_name')
-  const [sortDir, setSortDir]       = useState<'asc' | 'desc'>('asc')
-  const [page, setPage]             = useState(1)
+  const [roleFilter, setRoleFilter]       = useState<RoleFilter>('ALL')
+  const [programFilter, setProgramFilter] = useState('')
+  const [programs, setPrograms]           = useState<BackendProgram[]>([])
+  const [users, setUsers]                 = useState<BackendUser[]>([])
+  const [loading, setLoading]             = useState(true)
+  const [error, setError]                 = useState('')
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingUser, setEditingUser]     = useState<BackendUser | null>(null)
+  const [detailUser, setDetailUser]       = useState<BackendUser | null>(null)
+  const [search, setSearch]               = useState('')
+  const [sortCol, setSortCol]             = useState<'full_name' | 'email' | 'role' | 'status' | 'created_at'>('full_name')
+  const [sortDir, setSortDir]             = useState<'asc' | 'desc'>('asc')
+  const [page, setPage]                   = useState(1)
   const PAGE_SIZE = 20
 
-  const load = useCallback(async (filter: RoleFilter) => {
+  // Load programs for filter dropdown
+  useEffect(() => {
+    programService.listAll()
+      .then(setPrograms)
+      .catch(() => { /* silently ignore */ })
+  }, [])
+
+  const load = useCallback(async (filter: RoleFilter, progId: string) => {
     setLoading(true)
     setError('')
     try {
       const res = await userService.list({
         ...(filter !== 'ALL' ? { role: filter } : {}),
+        ...(progId ? { program_id: progId } : {}),
         limit: 100,
       })
       setUsers(res.data)
@@ -1122,14 +1465,18 @@ function UsuariosTab() {
     let cancelled = false
     setLoading(true)
     setError('')
-    userService.list({ ...(roleFilter !== 'ALL' ? { role: roleFilter } : {}), limit: 100 })
+    userService.list({
+      ...(roleFilter !== 'ALL' ? { role: roleFilter } : {}),
+      ...(programFilter ? { program_id: programFilter } : {}),
+      limit: 100,
+    })
       .then(res => { if (!cancelled) setUsers(res.data) })
       .catch(err => { if (!cancelled) setError(friendlyError(err)) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [roleFilter])
+  }, [roleFilter, programFilter])
 
-  useEffect(() => { setPage(1) }, [search, roleFilter])
+  useEffect(() => { setPage(1) }, [search, roleFilter, programFilter])
 
   const filtered = useMemo(() => {
     let list = [...users]
@@ -1164,40 +1511,65 @@ function UsuariosTab() {
       : <ChevronDown size={12} className="inline ml-0.5" />
   }
 
+  // Called when a user is edited — update local state
+  const handleUserUpdated = (updated: BackendUser) => {
+    setUsers(prev => prev.map(u => u.id === updated.id ? updated : u))
+    if (detailUser?.id === updated.id) setDetailUser(updated)
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-extrabold text-usb-text">
           Usuarios
           {users.length > 0 && (
-            <span className="ml-2 text-xs font-bold bg-ar-cyan/10 text-ar-cyan px-2 py-0.5 rounded-full">
+            <span className="ml-2 text-xs font-bold bg-green-accent/10 text-green-accent px-2 py-0.5 rounded-full">
               {users.length}
             </span>
           )}
         </h2>
         <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-ar-cyan hover:bg-ar-cyan-dark text-white font-bold rounded-full px-5 py-2.5 text-sm transition-all"
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 bg-green-accent hover:bg-green-brand text-white font-bold rounded-full px-5 py-2.5 text-sm transition-all"
         >
           <Plus size={15} /> Nuevo Usuario
         </button>
       </div>
 
       {/* Role filter pills */}
-      <div className="flex items-center gap-1 bg-usb-canvas rounded-xl border border-usb-border p-1 w-fit">
-        {(Object.keys(ROLE_FILTER_LABELS) as RoleFilter[]).map(f => (
-          <button
-            key={f}
-            onClick={() => setRoleFilter(f)}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-              roleFilter === f
-                ? 'bg-white text-usb-text shadow-card border border-usb-border'
-                : 'text-usb-muted hover:text-usb-text'
-            }`}
-          >
-            {ROLE_FILTER_LABELS[f]}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-1 bg-usb-canvas rounded-xl border border-usb-border p-1">
+          {(Object.keys(ROLE_FILTER_LABELS) as RoleFilter[]).map(f => (
+            <button
+              key={f}
+              onClick={() => setRoleFilter(f)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                roleFilter === f
+                  ? 'bg-white text-usb-text shadow-card border border-usb-border'
+                  : 'text-usb-muted hover:text-usb-text'
+              }`}
+            >
+              {ROLE_FILTER_LABELS[f]}
+            </button>
+          ))}
+        </div>
+
+        {/* Program filter */}
+        {programs.length > 0 && (
+          <div className="relative min-w-[200px]">
+            <select
+              className={`${selectClass} text-xs py-2`}
+              value={programFilter}
+              onChange={e => setProgramFilter(e.target.value)}
+            >
+              <option value="">Todos los programas</option>
+              {programs.map(p => (
+                <option key={p.id} value={p.id}>{p.program_name}</option>
+              ))}
+            </select>
+            <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-usb-faint pointer-events-none" />
+          </div>
+        )}
       </div>
 
       {/* Search */}
@@ -1208,7 +1580,7 @@ function UsuariosTab() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por nombre o correo…"
-          className="w-full pl-9 pr-4 py-2.5 bg-usb-canvas border border-usb-border rounded-xl text-sm focus:outline-none focus:border-ar-cyan focus:ring-2 focus:ring-ar-cyan/20 transition-all"
+          className="w-full pl-9 pr-4 py-2.5 bg-usb-canvas border border-usb-border rounded-xl text-sm focus:outline-none focus:border-green-accent focus:ring-2 focus:ring-green-accent/20 transition-all"
         />
       </div>
 
@@ -1260,7 +1632,13 @@ function UsuariosTab() {
             </thead>
             <tbody>
               {pageUsers.map((u, i) => (
-                <UserRow key={u.id} user={u} index={i} />
+                <UserRow
+                  key={u.id}
+                  user={u}
+                  index={i}
+                  onEdit={setEditingUser}
+                  onDetail={setDetailUser}
+                />
               ))}
             </tbody>
           </table>
@@ -1295,10 +1673,24 @@ function UsuariosTab() {
       )}
 
       <AnimatePresence>
-        {showModal && (
+        {showCreateModal && (
           <CreateUserModal
-            onClose={() => setShowModal(false)}
-            onCreated={() => void load(roleFilter)}
+            onClose={() => setShowCreateModal(false)}
+            onCreated={() => void load(roleFilter, programFilter)}
+          />
+        )}
+        {editingUser && (
+          <EditUserModal
+            user={editingUser}
+            onClose={() => setEditingUser(null)}
+            onSaved={handleUserUpdated}
+          />
+        )}
+        {detailUser && (
+          <UserDetailDrawer
+            user={detailUser}
+            onClose={() => setDetailUser(null)}
+            onStatusChange={handleUserUpdated}
           />
         )}
       </AnimatePresence>
@@ -1308,17 +1700,17 @@ function UsuariosTab() {
 
 // ─── Main AdminPage ───────────────────────────────────────────────────────────
 
+// Universidades hidden — reserved for future feature
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-  { key: 'universidades', label: 'Universidades', icon: Building2 },
-  { key: 'programas',     label: 'Programas',     icon: BookOpen },
-  { key: 'materias',      label: 'Materias',       icon: BookMarked },
-  { key: 'usuarios',      label: 'Usuarios',       icon: Users },
+  { key: 'programas', label: 'Programas', icon: BookOpen },
+  { key: 'materias',  label: 'Materias',  icon: BookMarked },
+  { key: 'usuarios',  label: 'Usuarios',  icon: Users },
 ]
 
 export default function AdminPage() {
   const { user, logout } = useAuth()
   const navigate         = useNavigate()
-  const [activeTab, setActiveTab] = useState<Tab>('universidades')
+  const [activeTab, setActiveTab] = useState<Tab>('usuarios')
 
   const handleLogout = () => { logout(); navigate('/login') }
 
@@ -1330,23 +1722,36 @@ export default function AdminPage() {
     <div className="min-h-screen bg-usb-canvas flex flex-col">
 
       {/* Header */}
-      <header className="bg-ar-navy border-b border-white/10 sticky top-0 z-40 shadow-lg">
+      <header
+        className="border-b border-white/10 sticky top-0 z-[1000] shadow-lg"
+        style={{ background: 'var(--green-deep)' }}
+      >
         <div className="flex items-center justify-between px-6 py-3 max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
-            <img src="/assets/ar-icon.png" alt="Academic Risk" className="h-8 w-auto" />
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(212,233,226,0.18)', border: '1px solid rgba(212,233,226,0.35)' }}
+            >
+              <span
+                className="font-black select-none"
+                style={{ color: 'var(--green-light)', fontSize: '0.72rem', letterSpacing: '-0.04em' }}
+              >
+                AR
+              </span>
+            </div>
             <div>
               <span className="text-white font-extrabold text-sm tracking-tight">Academic Risk</span>
               <p className="text-white/40 text-[0.62rem] leading-none mt-0.5">Panel de Administración</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 bg-ar-cyan/10 border border-ar-cyan/20 px-3 py-1.5 rounded-full">
-              <ShieldCheck size={13} className="text-ar-cyan" />
-              <span className="text-ar-cyan text-xs font-bold">Administrador</span>
+            <div className="hidden sm:flex items-center gap-2 bg-green-accent/10 border border-green-accent/20 px-3 py-1.5 rounded-full">
+              <ShieldCheck size={13} className="text-green-accent" />
+              <span className="text-green-accent text-xs font-bold">Administrador</span>
             </div>
             <div className="w-px h-5 bg-white/10" />
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-ar-cyan/20 border border-ar-cyan/30 flex items-center justify-center text-ar-cyan font-extrabold text-xs">
+              <div className="w-8 h-8 rounded-full bg-green-accent/20 border border-green-accent/30 flex items-center justify-center text-green-accent font-extrabold text-xs">
                 {initials}
               </div>
               <span className="hidden sm:block text-white text-xs font-bold">{user?.name}</span>
@@ -1363,7 +1768,7 @@ export default function AdminPage() {
       </header>
 
       {/* Tab bar */}
-      <div className="bg-white border-b border-usb-border sticky top-[57px] z-30">
+      <div className="bg-white border-b border-usb-border sticky top-[56px] z-[999]">
         <div className="max-w-7xl mx-auto px-6 flex gap-1">
           {TABS.map(tab => {
             const Icon = tab.icon
@@ -1374,7 +1779,7 @@ export default function AdminPage() {
                 onClick={() => setActiveTab(tab.key)}
                 className={`flex items-center gap-2 px-4 py-3.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
                   isActive
-                    ? 'border-ar-cyan text-ar-cyan'
+                    ? 'border-green-accent text-green-accent'
                     : 'border-transparent text-usb-muted hover:text-usb-text hover:border-usb-border'
                 }`}
               >
@@ -1391,10 +1796,10 @@ export default function AdminPage() {
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
           >
             {activeTab === 'universidades' && <UniversidadesTab />}
             {activeTab === 'programas'     && <ProgramasTab />}
@@ -1405,7 +1810,7 @@ export default function AdminPage() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-ar-navy border-t border-white/10 py-3 text-center">
+      <footer className="border-t border-white/10 py-3 text-center" style={{ background: 'var(--green-deep)' }}>
         <p className="text-white/25 text-xs">Academic Risk · Panel Administrativo</p>
       </footer>
     </div>

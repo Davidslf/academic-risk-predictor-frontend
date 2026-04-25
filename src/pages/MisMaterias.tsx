@@ -188,21 +188,31 @@ export default function MisMaterias() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-usb-canvas flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--canvas-warm)' }}>
       <Header />
 
-      {/* Page header */}
-      <div className="bg-ar-navy border-b border-white/10 px-5 py-6">
+      {/* Page header — slightly lighter band so it separates from the nav */}
+      <div
+        className="px-5 py-6"
+        style={{
+          background:  'var(--green-mid)',
+          borderTop:   '1px solid rgba(255,255,255,0.10)',
+          borderBottom: '1px solid rgba(0,0,0,0.20)',
+        }}
+      >
         <div className="max-w-5xl mx-auto">
           {!loading && mainProgram && (
             <div className="flex items-center gap-2 mb-2">
               {mainProgram.program_code && (
-                <span className="bg-ar-cyan/20 text-ar-cyan text-[0.65rem] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+                <span
+                  className="text-[0.65rem] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full"
+                  style={{ background: 'rgba(212,233,226,0.18)', color: 'var(--green-light)' }}
+                >
                   {mainProgram.program_code}
                 </span>
               )}
               {mainProgram.degree_type && (
-                <span className="bg-white/10 text-white/60 text-[0.65rem] font-bold px-2.5 py-0.5 rounded-full">
+                <span className="bg-white/10 text-white/55 text-[0.65rem] font-bold px-2.5 py-0.5 rounded-full">
                   {mainProgram.degree_type}
                 </span>
               )}
@@ -210,38 +220,39 @@ export default function MisMaterias() {
           )}
 
           <div className="flex items-center gap-2 mb-1">
-            <GraduationCap size={20} className="text-ar-cyan" />
-            <h1 className="text-white font-extrabold text-2xl tracking-tight">{pageTitle}</h1>
+            <GraduationCap size={20} style={{ color: 'var(--green-light)' }} />
+            <h1 className="text-white font-extrabold text-2xl" style={{ letterSpacing: '-0.02em' }}>{pageTitle}</h1>
           </div>
 
           {!loading && mainProgram?.institution && (
-            <p className="text-white/40 text-sm">{mainProgram.institution}</p>
+            <p className="text-white/38 text-sm">{mainProgram.institution}</p>
           )}
 
           {/* Global progress bar */}
           {!loading && !error && !noAccess && groups.length > 0 && (
             <div className="mt-5">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-white/50 text-xs font-medium">
+                <span className="text-white/45 text-xs font-medium">
                   {advancedCredits} de {totalCreditsProgram} créditos
                 </span>
-                <span className="text-ar-cyan text-sm font-extrabold">
+                <span className="text-sm font-extrabold" style={{ color: 'var(--green-light)' }}>
                   {globalProgressPct}%
                 </span>
               </div>
-              <div className="h-3 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.12)' }}>
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${globalProgressPct}%` }}
                   transition={{ duration: 1, ease: 'easeOut' }}
-                  className="h-full bg-ar-cyan rounded-full"
+                  className="h-full rounded-full"
+                  style={{ background: 'var(--green-light)' }}
                 />
               </div>
               <div className="flex items-center justify-between mt-1.5">
-                <span className="text-white/40 text-[0.65rem] font-medium">
+                <span className="text-white/35 text-[0.65rem] font-medium">
                   {totalActive + totalCompleted} de {totalPensumCourses} materias
                 </span>
-                <span className="text-white/40 text-[0.65rem] font-medium">
+                <span className="text-white/35 text-[0.65rem] font-medium">
                   {totalCreditsRemain} créditos restantes
                 </span>
               </div>
@@ -254,43 +265,44 @@ export default function MisMaterias() {
         {/* Loading */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 size={32} className="text-ar-cyan animate-spin mb-4" />
-            <p className="text-usb-muted text-sm font-medium">Cargando tu progreso…</p>
+            <Loader2 size={30} className="animate-spin mb-4" style={{ color: 'var(--green-accent)' }} />
+            <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Cargando tu progreso…</p>
           </div>
         )}
 
         {/* No access */}
         {noAccess && (
-          <div className="bg-white rounded-2xl border border-amber-200 p-10 text-center">
+          <div className="bg-white rounded-2xl border border-amber-200 p-10 text-center" style={{ boxShadow: 'var(--shadow-card)' }}>
             <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto mb-4">
               <ShieldAlert size={24} className="text-amber-500" />
             </div>
-            <h3 className="text-usb-text font-bold text-lg mb-2">Acceso pendiente</h3>
-            <p className="text-usb-muted text-sm max-w-md mx-auto mb-4">
+            <h3 className="font-bold text-lg mb-2" style={{ color: 'var(--text-dark)' }}>Acceso pendiente</h3>
+            <p className="text-sm max-w-md mx-auto mb-4" style={{ color: 'var(--text-muted)' }}>
               Tu cuenta aún no tiene permisos para consultar tus inscripciones.
               Contacta al administrador.
             </p>
-            <button onClick={fetchData} className="text-ar-cyan text-sm font-bold hover:underline">Reintentar</button>
+            <button onClick={fetchData} className="text-sm font-bold hover:underline" style={{ color: 'var(--green-accent)' }}>Reintentar</button>
           </div>
         )}
 
         {/* Error */}
         {error && (
-          <div className="bg-white rounded-2xl border border-rose-200 p-8 text-center">
-            <AlertCircle size={32} className="text-rose-400 mx-auto mb-3" />
-            <p className="font-bold text-usb-text mb-2">{error}</p>
-            <button onClick={fetchData} className="text-ar-cyan text-sm font-bold hover:underline">Reintentar</button>
+          <div className="bg-white rounded-2xl border border-rose-200 p-8 text-center" style={{ boxShadow: 'var(--shadow-card)' }}>
+            <AlertCircle size={30} className="text-rose-400 mx-auto mb-3" />
+            <p className="font-bold mb-2" style={{ color: 'var(--text-dark)' }}>{error}</p>
+            <button onClick={fetchData} className="text-sm font-bold hover:underline" style={{ color: 'var(--green-accent)' }}>Reintentar</button>
           </div>
         )}
 
         {/* Empty */}
         {!loading && !error && !noAccess && groups.length === 0 && (
-          <div className="bg-white rounded-2xl border-2 border-dashed border-usb-border p-12 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4 border border-usb-border">
-              <BookOpen size={24} className="text-usb-faint" />
+          <div className="bg-white rounded-2xl border-2 border-dashed p-12 text-center" style={{ borderColor: 'rgba(0,0,0,0.10)' }}>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                 style={{ background: 'var(--canvas-warm)', border: '1px solid rgba(0,0,0,0.08)' }}>
+              <BookOpen size={24} style={{ color: 'var(--text-faint)' }} />
             </div>
-            <h3 className="text-usb-text font-bold text-lg mb-2">No tienes materias inscritas</h3>
-            <p className="text-usb-muted text-sm max-w-md mx-auto">
+            <h3 className="font-bold text-lg mb-2" style={{ color: 'var(--text-dark)' }}>No tienes materias inscritas</h3>
+            <p className="text-sm max-w-md mx-auto" style={{ color: 'var(--text-muted)' }}>
               Tus materias aparecerán aquí una vez que estés inscrito en cursos del período académico actual.
             </p>
           </div>
@@ -302,21 +314,23 @@ export default function MisMaterias() {
             {/* 5 stat boxes */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
               {[
-                { icon: Layers,       label: 'Materias del programa', value: totalPensumCourses,  color: 'text-violet-500',  bg: 'bg-violet-50' },
-                { icon: BookOpen,     label: 'Materias cursando',     value: totalActive,          color: 'text-ar-cyan',     bg: 'bg-ar-cyan/10' },
-                { icon: TrendingUp,   label: 'Créditos cursando',     value: totalActiveCredits,   color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                { icon: CheckSquare,  label: 'Créditos aprobados',    value: totalCompCredits,     color: 'text-risk-low',    bg: 'bg-risk-low-bg' },
-                { icon: Hash,         label: 'Créditos restantes',    value: totalCreditsRemain,   color: 'text-amber-500',   bg: 'bg-amber-50' },
+                { icon: Layers,      label: 'Materias del programa', value: totalPensumCourses, iconBg: 'rgba(0,117,74,0.08)', iconColor: 'var(--green-brand)'  },
+                { icon: BookOpen,    label: 'Materias cursando',     value: totalActive,        iconBg: 'rgba(0,117,74,0.09)', iconColor: 'var(--green-accent)' },
+                { icon: TrendingUp,  label: 'Créditos cursando',     value: totalActiveCredits, iconBg: 'rgba(0,98,65,0.07)',  iconColor: 'var(--green-brand)'  },
+                { icon: CheckSquare, label: 'Créditos aprobados',    value: totalCompCredits,   iconBg: 'rgba(0,117,74,0.08)', iconColor: 'var(--green-accent)' },
+                { icon: Hash,        label: 'Créditos restantes',    value: totalCreditsRemain, iconBg: 'var(--gold-lightest)','iconColor': 'var(--gold)'       },
               ].map((stat, i) => (
                 <motion.div key={stat.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
-                  className="bg-white rounded-2xl p-4 shadow-card border border-usb-border flex items-center gap-3"
+                  className="bg-white rounded-2xl p-4 flex items-center gap-3"
+                  style={{ boxShadow: 'var(--shadow-card)' }}
                 >
-                  <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center flex-shrink-0`}>
-                    <stat.icon size={18} className={stat.color} />
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                       style={{ background: stat.iconBg }}>
+                    <stat.icon size={17} style={{ color: stat.iconColor }} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[0.62rem] font-bold uppercase tracking-wider text-usb-muted leading-tight">{stat.label}</p>
-                    <p className="text-lg font-extrabold text-usb-text leading-tight">{stat.value}</p>
+                    <p className="text-[0.60rem] font-extrabold uppercase tracking-wider leading-tight" style={{ color: 'var(--text-faint)' }}>{stat.label}</p>
+                    <p className="text-lg font-extrabold leading-tight" style={{ color: 'var(--text-dark)' }}>{stat.value}</p>
                   </div>
                 </motion.div>
               ))}
@@ -333,8 +347,8 @@ export default function MisMaterias() {
                 >
                   {groups.length > 1 && (
                     <div className="mb-3 flex items-center gap-2">
-                      <Layers size={14} className="text-ar-cyan" />
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-usb-muted">
+                      <Layers size={14} style={{ color: 'var(--green-accent)' }} />
+                      <h3 className="text-xs font-extrabold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
                         {group.program?.program_name ?? 'Programa'}
                       </h3>
                     </div>
@@ -343,7 +357,7 @@ export default function MisMaterias() {
                   {/* Active courses */}
                   {group.activeCourses.length > 0 && (
                     <>
-                      <p className="text-[0.68rem] font-bold uppercase tracking-wider text-usb-muted mb-2">
+                      <p className="text-[0.68rem] font-extrabold uppercase tracking-wider mb-2" style={{ color: 'var(--text-faint)' }}>
                         Cursando actualmente
                       </p>
                       <div className="grid gap-3 sm:grid-cols-2 mb-6">
@@ -357,7 +371,7 @@ export default function MisMaterias() {
                   {/* Completed courses */}
                   {group.completedCourses.length > 0 && (
                     <>
-                      <p className="text-[0.68rem] font-bold uppercase tracking-wider text-usb-muted mb-2">
+                      <p className="text-[0.68rem] font-extrabold uppercase tracking-wider mb-2" style={{ color: 'var(--text-faint)' }}>
                         Materias aprobadas
                       </p>
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -374,8 +388,11 @@ export default function MisMaterias() {
         )}
       </main>
 
-      <footer className="bg-ar-navy border-t border-white/10 py-4 text-center">
-        <p className="text-white/30 text-xs">Academic Risk · Mi Progreso</p>
+      <footer
+        className="py-4 text-center"
+        style={{ background: 'var(--green-deep)', borderTop: '1px solid rgba(255,255,255,0.14)' }}
+      >
+        <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.55)' }}>Academic Risk · Mi Progreso</p>
       </footer>
     </div>
   )
@@ -389,44 +406,49 @@ function CourseCard({ ec, index, gi, navigate }: {
 }) {
   const isCompleted = ec.enrollmentStatus === 'COMPLETED'
 
+  const accentColor = isCompleted ? '#16a34a' : 'var(--green-accent)'
+
   return (
     <motion.button
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: gi * 0.1 + index * 0.05 }}
+      whileHover={{ y: -2 }}
       onClick={() => navigate(`/materia/${ec.course.id}`)}
-      className={`bg-white rounded-2xl shadow-card border hover:shadow-card-hover p-5 text-left transition-all duration-200 group ${
-        isCompleted ? 'border-emerald-200 hover:border-emerald-300' : 'border-usb-border hover:border-ar-cyan/30'
-      }`}
+      className="bg-white rounded-2xl p-5 text-left transition-shadow duration-200 group no-tap"
+      style={{ boxShadow: 'var(--shadow-card)', border: `1px solid ${isCompleted ? 'rgba(22,163,74,0.20)' : 'rgba(0,0,0,0.07)'}` }}
     >
       <div className="flex items-start justify-between mb-3">
         <div>
-          <span className={`inline-block text-[0.68rem] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-2 ${
-            isCompleted ? 'bg-emerald-50 text-emerald-600' : 'bg-ar-cyan/10 text-ar-cyan'
-          }`}>
+          <span
+            className="inline-block text-[0.65rem] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full mb-2"
+            style={{ background: isCompleted ? 'rgba(22,163,74,0.09)' : 'rgba(0,117,74,0.09)', color: accentColor }}
+          >
             {ec.course.code}
           </span>
-          <h3 className={`font-bold text-[0.95rem] text-usb-text leading-snug transition-colors ${
-            isCompleted ? 'group-hover:text-emerald-600' : 'group-hover:text-ar-cyan'
-          }`}>
+          <h3
+            className="font-bold text-[0.95rem] leading-snug transition-colors"
+            style={{ color: 'var(--text-dark)' }}
+          >
             {ec.course.name}
           </h3>
         </div>
-        <ChevronRight size={16} className="text-usb-faint group-hover:text-ar-cyan transition-colors mt-1 flex-shrink-0 ml-2" />
+        <ChevronRight size={15} className="mt-0.5 flex-shrink-0 ml-2 transition-transform group-hover:translate-x-0.5"
+                      style={{ color: 'var(--text-faint)' }} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs text-usb-muted">
+      <div className="flex flex-wrap items-center gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
         <div className="flex items-center gap-1.5">
-          <Hash size={12} />
+          <Hash size={11} />
           <span>{ec.course.credits} créditos</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <Calendar size={12} />
+          <Calendar size={11} />
           <span>{ec.course.academic_period}</span>
         </div>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-usb-border">
+      <div className="mt-3 pt-3 border-t" style={{ borderColor: 'rgba(0,0,0,0.07)' }}>
         <div className="flex items-center gap-1.5">
           {isCompleted ? (
             <>
@@ -435,8 +457,8 @@ function CourseCard({ ec, index, gi, navigate }: {
             </>
           ) : (
             <>
-              <div className="w-2 h-2 rounded-full bg-ar-cyan" />
-              <span className="text-xs font-semibold text-ar-cyan">Cursando</span>
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--green-accent)' }} />
+              <span className="text-xs font-semibold" style={{ color: 'var(--green-accent)' }}>Cursando</span>
             </>
           )}
         </div>

@@ -33,21 +33,22 @@ export default function TourGuide({ run, steps, onEnd }: Props) {
         showProgress:       true,
         skipBeacon:         true,
         overlayClickAction: false,
-        backgroundColor:    '#1A2B4A',
-        textColor:          'rgba(255,255,255,0.85)',
-        primaryColor:       '#00B4D8',
-        overlayColor:       'rgba(0,0,0,0.55)',
+        backgroundColor:    '#1E3932',   // --green-deep
+        textColor:          'rgba(255,255,255,0.88)',
+        primaryColor:       '#00754A',   // --green-accent
+        overlayColor:       'rgba(0,0,0,0.50)',
         zIndex:             20000,
         buttons:            ['back', 'primary', 'skip'],
         width:              360,
       }}
       locale={{
-        back:  'Atrás',
-        close: 'Cerrar',
-        last:  '¡Listo!',
-        next:  'Siguiente',
-        open:  'Abrir',
-        skip:  'Saltar tour',
+        back:             'Atrás',
+        close:            'Cerrar',
+        last:             '¡Listo!',
+        next:             'Siguiente',
+        nextWithProgress: 'Siguiente ({current} de {total})',
+        open:             'Abrir',
+        skip:             'Saltar tour',
       }}
       styles={{
         tooltip: {
@@ -57,7 +58,7 @@ export default function TourGuide({ run, steps, onEnd }: Props) {
           boxShadow:    '0 20px 60px -10px rgba(0,0,0,0.4)',
         },
         tooltipTitle: {
-          color:        '#00B4D8',
+          color:        '#d4e9e2',   // --green-light
           fontWeight:   700,
           fontSize:     '0.9rem',
           marginBottom: '0.4rem',
@@ -70,7 +71,7 @@ export default function TourGuide({ run, steps, onEnd }: Props) {
           marginTop: '0.75rem',
         },
         buttonPrimary: {
-          backgroundColor: '#00B4D8',
+          backgroundColor: '#00754A',  // --green-accent
           borderRadius:    '999px',
           fontSize:        '0.78rem',
           fontWeight:      700,
@@ -89,11 +90,11 @@ export default function TourGuide({ run, steps, onEnd }: Props) {
           color: 'rgba(255,255,255,0.35)',
         },
         beaconInner: {
-          backgroundColor: '#00B4D8',
+          backgroundColor: '#00754A',  // --green-accent
         },
         beaconOuter: {
-          backgroundColor: 'rgba(0,180,216,0.25)',
-          borderColor:     '#00B4D8',
+          backgroundColor: 'rgba(0,117,74,0.25)',
+          borderColor:     '#00754A',
         },
       }}
     />
