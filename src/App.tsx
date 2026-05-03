@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from './context/AuthContext'
 import { useGrades } from './context/GradesContext'
 import LoginPage from './pages/Login'
-import Landing from './pages/Landing'
 import Prediccion from './pages/Prediccion'
 import MisMaterias from './pages/MisMaterias'
 import MateriaDetalle from './pages/MateriaDetalle'
@@ -178,15 +177,13 @@ export default function App() {
               <RequireRole role="admin"><AdminPage /></RequireRole>
             } />
 
-            {/* Student */}
+            {/* Student — Mi Progreso is the home */}
             <Route path="/" element={
-              <RequireRole role="student"><Landing /></RequireRole>
+              <RequireRole role="student"><MisMaterias /></RequireRole>
             } />
+            <Route path="/mis-materias" element={<Navigate to="/" replace />} />
             <Route path="/prediccion" element={
               <RequireRole role="student"><Prediccion /></RequireRole>
-            } />
-            <Route path="/mis-materias" element={
-              <RequireRole role="student"><MisMaterias /></RequireRole>
             } />
             <Route path="/materia/:courseId" element={
               <RequireRole role="student"><MateriaDetalle /></RequireRole>
