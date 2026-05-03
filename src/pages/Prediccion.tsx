@@ -1,35 +1,46 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+/**
+ * Prediccion — Student risk prediction page.
+ *
+ * Data flow:
+ *  1. GET /students/{id}/enrollments → student's active enrollments (with grades)
+ *  2. GET /courses/{id} for each → course details
+ *  3. If enrollment has DB grades → auto-run POST /predict
+ *  4. POST /chat  → AI counselor
+ */
+
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  BarChart2, Send, X, Bot, User, ChevronDown,
-  AlertTriangle, CheckCircle2, Loader2, Calculator,
-  RotateCcw, Info, Sparkles, BookOpen, ChevronRight
+  BarChart2, Send, X, Bot, User, Calculator,
+  AlertTriangle, CheckCircle2, Loader2,
+  RotateCcw, Info, Sparkles, BookOpen,
+  GraduationCap, ChevronDown, ChevronUp,
+  Lightbulb, TrendingUp, TrendingDown, Minus as MinusIcon,
+  Database, ChevronRight, ChevronLeft,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import {
   Chart as ChartJS,
   ArcElement, BarElement, CategoryScale, LinearScale,
-  Tooltip, Legend
+  Tooltip, Legend, RadialLinearScale, PointElement, LineElement, Filler,
 } from 'chart.js'
-import { Doughnut, Bar } from 'react-chartjs-2'
+import { Doughnut, Bar, Radar } from 'react-chartjs-2'
 import Header from '../components/Header'
 import { useAuth } from '../context/AuthContext'
-import { useGrades } from '../context/GradesContext'
-import { gradeColor } from '../utils/gradeCalculator'
-import type { Course } from '../types'
+import { enrollmentService, type BackendEnrollment } from '../services/enrollmentService'
+import { courseService, type BackendCourse } from '../services/courseService'
 import { predictionService } from '../services/predictionService'
 import { notificationService } from '../services/notificationService'
-import { courseService } from '../services/courseService'
+import { ApiError } from '../services/api'
 
-ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend)
-
-const PROMEDIOS_APROBADOS = {
-  asistencia:  88.5,
-  seguimiento: 3.9,
-  parcial:     3.8,
-  logins:      56.2,
-}
+ChartJS.register(
+  ArcElement, BarElement, CategoryScale, LinearScale,
+  Tooltip, Legend, RadialLinearScale, PointElement, LineElement, Filler,
+)
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
 interface FormData {
   asistencia:  number
   seguimiento: number
@@ -60,12 +71,10 @@ interface PredictionResult {
   }
 }
 
-interface ChatMessage {
-  role: 'bot' | 'user'
-  text: string
-}
+interface ChatMessage { role: 'bot' | 'user'; text: string }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function riskColor(nivel: string) {
   if (nivel === 'BAJO') return '#16a34a'
   if (nivel === 'ALTO') return '#dc2626'
@@ -82,122 +91,31 @@ function riskIcon(nivel: string) {
   return <Info size={16} />
 }
 
-function avg(arr: number[]) {
-  return arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null
-}
+// ─── Animated reveal wrapper ─────────────────────────────────────────────────
 
-function fmt1(n: number) { return Math.round(n * 10) / 10 }
-
-// ─── Derive predictor inputs from a single course ────────────────────────────
-function deriveFromCourse(
-  studentId: string,
-  course: Course,
-  grades: ReturnType<typeof useGrades>['grades']
-): FormData {
-  const parcialVals: number[] = []
-  const quizVals:    number[] = []
-  const asistVals:   number[] = []
-
-  for (const comp of course.components) {
-    const g = grades.find(gr => gr.studentId === studentId && gr.componentId === comp.id)
-    if (g?.value == null) continue
-    const name = comp.name.toLowerCase()
-    if (name.includes('parcial') || name.includes('examen'))
-      parcialVals.push(g.value)
-    else if (name.includes('quiz') || name.includes('seguimiento') || name.includes('taller') || name.includes('proyecto'))
-      quizVals.push(g.value)
-    else if (name.includes('asist'))
-      asistVals.push(g.value)
-  }
-
-  return {
-    asistencia:  asistVals.length  > 0 ? Math.min(100, fmt1(avg(asistVals)!  * 20)) : 85,
-    seguimiento: quizVals.length   > 0 ? fmt1(avg(quizVals)!)   : 3.5,
-    parcial:     parcialVals.length > 0 ? fmt1(avg(parcialVals)!) : 3.2,
-    logins:      42,
-    tutorias:    true,
-  }
-}
-
-// ─── Grade cards panel ───────────────────────────────────────────────────────
-function CourseGradePanel({
-  course, studentId, grades
-}: {
-  course: Course
-  studentId: string
-  grades: ReturnType<typeof useGrades>['grades']
-}) {
+function RevealCard({ delay = 0, children }: { delay?: number; children: React.ReactNode }) {
   return (
-    <div className="space-y-2">
-      {course.components.map(comp => {
-        const g = grades.find(gr => gr.studentId === studentId && gr.componentId === comp.id)
-        const val = g?.value ?? null
-        return (
-          <div
-            key={comp.id}
-            className="flex items-center justify-between px-4 py-3 bg-usb-canvas rounded-xl border border-usb-border hover:border-ar-cyan/30 transition-colors"
-          >
-            <span className="text-sm font-medium text-usb-subtle leading-tight">{comp.name}</span>
-            <div className="flex items-center gap-2.5 flex-shrink-0 ml-2">
-              <span className="text-[0.7rem] font-bold text-ar-cyan bg-ar-cyan/10 border border-ar-cyan/20 px-2 py-0.5 rounded-full">
-                {comp.percentage}%
-              </span>
-              {val !== null ? (
-                <span className={`font-mono font-extrabold text-sm w-10 text-right tabular-nums ${gradeColor(val)}`}>
-                  {val.toFixed(1)}
-                </span>
-              ) : (
-                <span className="font-mono text-usb-faint text-sm w-10 text-right">—</span>
-              )}
-            </div>
-          </div>
-        )
-      })}
-    </div>
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, delay, ease: 'easeOut' }}
+    >
+      {children}
+    </motion.div>
   )
 }
 
-// ─── Logins slider (only manual input left) ──────────────────────────────────
-function LoginsSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const pct = (value / 100) * 100
-  return (
-    <div className="mb-5">
-      <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-semibold text-usb-subtle">Inicios de sesión plataforma</label>
-        <span className="inline-block text-xs font-bold px-3 py-1 rounded-full min-w-[52px] text-center bg-ar-navy text-white">
-          {value}
-        </span>
-      </div>
-      <div className="relative h-2 rounded-full bg-usb-border">
-        <div className="absolute h-2 rounded-full bg-ar-cyan transition-all" style={{ width: `${pct}%` }} />
-        <input
-          type="range" min={0} max={100} step={1} value={value}
-          onChange={e => onChange(parseInt(e.target.value))}
-          className="absolute inset-0 w-full opacity-0 cursor-pointer h-2"
-        />
-        <div
-          className="absolute w-4 h-4 rounded-full shadow-sm -translate-y-1 -translate-x-2 bg-white border-2 border-ar-cyan pointer-events-none transition-all"
-          style={{ left: `${pct}%` }}
-        />
-      </div>
-      <div className="flex justify-between mt-1">
-        <span className="text-[0.65rem] text-usb-faint">0</span>
-        <span className="text-[0.65rem] text-usb-faint">100</span>
-      </div>
-    </div>
-  )
-}
+// ─── Gauge chart ─────────────────────────────────────────────────────────────
 
-// ─── Gauge ───────────────────────────────────────────────────────────────────
 function GaugeChart({ pct, nivel }: { pct: number; nivel: string }) {
   const color = riskColor(nivel)
-  const displayPct = fmt1(pct)
+  const display = Math.round(pct * 10) / 10
   return (
     <div className="relative">
       <Doughnut
         data={{
           datasets: [{
-            data: [displayPct, 100 - displayPct],
+            data: [display, 100 - display],
             backgroundColor: [color, '#e5e7eb'],
             borderWidth: 0,
             circumference: 180,
@@ -205,27 +123,74 @@ function GaugeChart({ pct, nivel }: { pct: number; nivel: string }) {
           }],
         }}
         options={{
-          cutout: '70%',
+          cutout: '72%',
           plugins: { legend: { display: false }, tooltip: { enabled: false } },
           responsive: true,
           maintainAspectRatio: true,
           aspectRatio: 2,
         } as any}
       />
-      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center pb-1">
-        <span className="text-4xl font-black tabular-nums" style={{ color }}>
-          {displayPct}%
-        </span>
+      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center pb-2">
+        <span className="text-4xl font-black tabular-nums" style={{ color }}>{display}%</span>
         <span className="text-xs text-usb-muted font-semibold tracking-wide">de riesgo</span>
       </div>
     </div>
   )
 }
 
-// ─── Bar chart ───────────────────────────────────────────────────────────────
-function CompareBar({ title, labels, studentVals, avgVals, maxY, stepY }: {
-  title: string; labels: string[]; studentVals: number[]
-  avgVals: number[]; maxY?: number; stepY?: number
+// ─── Radar chart ─────────────────────────────────────────────────────────────
+
+function RadarChart({ datos }: { datos: PredictionResult['datos_radar'] }) {
+  return (
+    <Radar
+      data={{
+        labels: datos.labels,
+        datasets: [
+          {
+            label: 'Tus datos',
+            data: datos.estudiante,
+            backgroundColor: 'rgba(0,180,216,0.15)',
+            borderColor: 'rgba(0,180,216,0.85)',
+            borderWidth: 2,
+            pointBackgroundColor: 'rgba(0,180,216,0.85)',
+            pointRadius: 4,
+          },
+          {
+            label: 'Promedio aprobados',
+            data: datos.promedio_aprobado,
+            backgroundColor: 'rgba(22,163,74,0.10)',
+            borderColor: 'rgba(22,163,74,0.65)',
+            borderWidth: 2,
+            borderDash: [4, 4],
+            pointBackgroundColor: 'rgba(22,163,74,0.65)',
+            pointRadius: 3,
+          },
+        ],
+      }}
+      options={{
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { font: { size: 11 }, padding: 12, usePointStyle: true },
+          },
+        },
+        scales: {
+          r: {
+            beginAtZero: true,
+            grid: { color: 'rgba(0,0,0,0.05)' },
+            pointLabels: { font: { size: 10 } },
+          },
+        },
+      } as any}
+    />
+  )
+}
+
+// ─── Bar comparison ──────────────────────────────────────────────────────────
+
+function CompareBar({ labels, studentVals, avgVals }: {
+  labels: string[]; studentVals: number[]; avgVals: number[]
 }) {
   return (
     <div style={{ height: '220px' }}>
@@ -243,32 +208,12 @@ function CompareBar({ title, labels, studentVals, avgVals, maxY, stepY }: {
           plugins: {
             legend: {
               position: 'top',
-              labels: {
-                font: { size: 11, family: "'Plus Jakarta Sans', system-ui, sans-serif" },
-                padding: 12,
-                usePointStyle: true,
-                pointStyleWidth: 8,
-              },
-            },
-            title: {
-              display: true,
-              text: title,
-              font: { size: 12, weight: 'bold', family: "'Plus Jakarta Sans', system-ui, sans-serif" },
-              padding: { bottom: 8 },
+              labels: { font: { size: 11 }, padding: 12, usePointStyle: true, pointStyleWidth: 8 },
             },
           },
           scales: {
-            y: {
-              beginAtZero: true,
-              grid: { color: 'rgba(0,0,0,0.04)' },
-              ticks: { font: { size: 10 } },
-              ...(maxY  ? { max: maxY }                    : {}),
-              ...(stepY ? { ticks: { stepSize: stepY, font: { size: 10 } } } : {}),
-            },
-            x: {
-              grid: { display: false },
-              ticks: { font: { size: 11 } },
-            },
+            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 10 } } },
+            x: { grid: { display: false }, ticks: { font: { size: 10 } } },
           },
         } as any}
       />
@@ -276,19 +221,211 @@ function CompareBar({ title, labels, studentVals, avgVals, maxY, stepY }: {
   )
 }
 
-// ─── Chat bubble ─────────────────────────────────────────────────────────────
-function ChatBot({ result, formData }: { result: PredictionResult | null; formData: FormData }) {
-  const [open, setOpen] = useState(false)
+// ─── Math modal — visual explainer ───────────────────────────────────────────
+
+function MathModal({ result, onClose }: { result: PredictionResult; onClose: () => void }) {
+  const d = result.detalles_matematicos
+  const featureNames = ['Asistencia', 'Seguimiento', 'Parcial 1', 'Sesiones LMS', 'Tutorías']
+  const varColors = ['#00b4d8', '#16a34a', '#7c3aed', '#d97706', '#0ea5e9']
+
+  type NewCoef = { variable: string; coeficiente: number; valor: number; contribucion: number }
+  const isNewFormat = d.coeficientes.length > 0 && typeof d.coeficientes[0] === 'object'
+  const rows = featureNames.map((name, i) => {
+    if (isNewFormat) {
+      const coef = d.coeficientes[i] as NewCoef | undefined
+      return { name: coef?.variable ?? name, scaled: coef?.valor ?? 0, coef: coef?.coeficiente ?? 0, impact: coef?.contribucion ?? 0, color: varColors[i] }
+    }
+    const scaled  = (d.features_scaled ?? [])[i] ?? 0
+    const coefNum = d.coeficientes[i] as number ?? 0
+    return { name, scaled, coef: coefNum, impact: scaled * coefNum, color: varColors[i] }
+  })
+
+  const maxImpact = Math.max(...rows.map(r => Math.abs(r.impact)), 0.001)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+        onClick={e => e.stopPropagation()}
+        className="bg-white w-full sm:rounded-2xl sm:max-w-xl max-h-[90vh] overflow-hidden flex flex-col rounded-t-2xl"
+        style={{ boxShadow: '0 -4px 60px rgba(0,0,0,0.20)' }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-usb-border flex-shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-ar-cyan/10 flex items-center justify-center">
+              <Calculator size={16} className="text-ar-cyan" />
+            </div>
+            <div>
+              <h3 className="font-bold text-usb-text text-sm leading-tight">¿Cómo calculamos tu riesgo?</h3>
+              <p className="text-[0.62rem] text-usb-faint">Regresión logística — paso a paso</p>
+            </div>
+          </div>
+          <button onClick={onClose}
+            className="w-8 h-8 rounded-full bg-usb-canvas hover:bg-usb-border flex items-center justify-center transition-colors">
+            <X size={15} className="text-usb-muted" />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+
+          {/* Step 1: Impact per variable */}
+          <div>
+            <p className="text-[0.65rem] font-bold uppercase tracking-widest text-usb-faint mb-3">
+              Impacto de cada variable
+            </p>
+            <div className="space-y-2.5">
+              {rows.map(({ name, impact, coef, color }) => {
+                const isProtective = impact < 0
+                const barPct = Math.abs(impact) / maxImpact * 100
+                return (
+                  <div key={name}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                        <span className="text-xs font-semibold text-usb-subtle">{name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[0.62rem] text-usb-faint font-mono">β={coef.toFixed(3)}</span>
+                        <span className={`text-xs font-bold tabular-nums ${isProtective ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {isProtective ? '↓' : '↑'} {Math.abs(impact).toFixed(3)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full bg-usb-border overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${barPct}%` }}
+                          transition={{ duration: 0.6, delay: rows.indexOf(rows.find(r => r.name === name)!) * 0.08 }}
+                          className="h-full rounded-full"
+                          style={{ background: isProtective ? '#16a34a' : '#ef4444' }}
+                        />
+                      </div>
+                      <span className={`text-[0.6rem] font-semibold w-16 text-right ${isProtective ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {isProtective ? 'reduce riesgo' : 'suma riesgo'}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex items-center gap-4 mt-3 pt-2.5 border-t border-usb-border">
+              <span className="flex items-center gap-1 text-[0.62rem] text-emerald-600 font-semibold">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" /> Verde = reduce riesgo
+              </span>
+              <span className="flex items-center gap-1 text-[0.62rem] text-red-500 font-semibold">
+                <span className="inline-block w-2 h-2 rounded-full bg-red-500" /> Rojo = suma riesgo
+              </span>
+            </div>
+          </div>
+
+          {/* Step 2: Formula */}
+          <div className="bg-usb-canvas rounded-xl p-4 border border-usb-border">
+            <p className="text-[0.62rem] font-bold uppercase tracking-widest text-usb-faint mb-2.5">Fórmula logit</p>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-usb-muted font-mono">z =</span>
+                <span className="text-xs font-mono text-usb-subtle">β₀ + β₁x₁ + β₂x₂ + β₃x₃ + β₄x₄ + β₅x₅</span>
+              </div>
+              {d.intercepto != null && d.valor_z != null && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-usb-muted font-mono">z =</span>
+                  <span className="text-sm font-black font-mono" style={{ color: 'var(--green-accent)' }}>
+                    {d.valor_z.toFixed(4)}
+                  </span>
+                  <span className="text-[0.62rem] text-usb-faint">(intercepto {d.intercepto.toFixed(4)})</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Step 3: Probability */}
+          <div className="rounded-xl p-4 border"
+            style={{ background: `${riskColor(result.nivel_riesgo)}0D`, borderColor: `${riskColor(result.nivel_riesgo)}30` }}>
+            <p className="text-[0.62rem] font-bold uppercase tracking-widest mb-2"
+              style={{ color: riskColor(result.nivel_riesgo) }}>
+              Probabilidad final
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="font-mono text-xs text-usb-muted">
+                P = 1 / (1 + e<sup>−z</sup>) =
+              </div>
+              <span className="text-2xl font-black tabular-nums" style={{ color: riskColor(result.nivel_riesgo) }}>
+                {result.porcentaje_riesgo.toFixed(1)}%
+              </span>
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${riskBgClass(result.nivel_riesgo)}`}>
+                {riskIcon(result.nivel_riesgo)} Riesgo {result.nivel_riesgo}
+              </span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+// ─── Slider input ─────────────────────────────────────────────────────────────
+
+function Slider({
+  label, value, onChange, min, max, step, unit, color = '#00b4d8',
+}: {
+  label: string; value: number; onChange: (v: number) => void
+  min: number; max: number; step: number; unit: string; color?: string
+}) {
+  const pct = ((value - min) / (max - min)) * 100
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="text-sm font-semibold text-usb-subtle">{label}</label>
+        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-usb-canvas border border-usb-border text-usb-text tabular-nums">
+          {step < 1 ? value.toFixed(1) : value}{unit}
+        </span>
+      </div>
+      <div className="relative h-2 rounded-full bg-usb-border">
+        <div className="absolute h-2 rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+        <input
+          type="range" min={min} max={max} step={step} value={value}
+          onChange={e => onChange(step < 1 ? parseFloat(e.target.value) : parseInt(e.target.value))}
+          className="absolute inset-0 w-full opacity-0 cursor-pointer h-2"
+        />
+        <div
+          className="absolute w-4 h-4 rounded-full shadow-sm -translate-y-1 -translate-x-2 bg-white border-2 pointer-events-none transition-all"
+          style={{ left: `${pct}%`, borderColor: color }}
+        />
+      </div>
+      <div className="flex justify-between mt-1">
+        <span className="text-[0.62rem] text-usb-faint">{min}{unit}</span>
+        <span className="text-[0.62rem] text-usb-faint">{max}{unit}</span>
+      </div>
+    </div>
+  )
+}
+
+// ─── Inline ChatBot ───────────────────────────────────────────────────────────
+
+function InlineChatBot({ result, formData }: { result: PredictionResult | null; formData: FormData }) {
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'bot', text: '¡Hola! Soy tu consejero académico virtual 🤖\nPresiona "Calcular mi riesgo" para obtener tu predicción y luego pregúntame lo que quieras.' },
+    {
+      role: 'bot',
+      text: result
+        ? `¡Hola! Tu riesgo académico es ${result.nivel_riesgo} (${Math.round(result.porcentaje_riesgo)}%). Cuéntame qué quieres mejorar y te ayudo con recomendaciones personalizadas 🎓`
+        : '¡Hola! Soy tu consejero académico virtual. Calcula primero tu predicción y luego podré darte recomendaciones personalizadas.',
+    },
   ])
-  const [input, setInput] = useState('')
+  const [input, setInput]   = useState('')
   const [loading, setLoading] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, open])
+  }, [messages])
 
   const send = async () => {
     const text = input.trim()
@@ -312,595 +449,1026 @@ function ChatBot({ result, formData }: { result: PredictionResult | null; formDa
       })
       setMessages(prev => [...prev, { role: 'bot', text: data.response }])
     } catch {
-      setMessages(prev => [...prev, { role: 'bot', text: 'Lo siento, no pude conectarme al servidor. Intenta de nuevo más tarde.' }])
+      setMessages(prev => [...prev, { role: 'bot', text: 'Lo siento, no pude conectarme al servidor. Intenta de nuevo.' }])
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <>
-      <AnimatePresence>
-        {!open && (
-          <motion.button
-            key="toggle"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-            onClick={() => setOpen(true)}
-            className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-ar-cyan hover:bg-ar-cyan-dark text-white flex items-center justify-center shadow-glow hover:shadow-lg transition-colors z-50"
-            title="Consejero Virtual IA"
-          >
-            <Bot size={24} />
-          </motion.button>
-        )}
-      </AnimatePresence>
+    <div className="bg-white rounded-2xl border border-usb-border overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
+      {/* Header */}
+      <div className="px-5 py-3.5 flex items-center gap-3 border-b border-usb-border"
+           style={{ background: 'var(--green-deep)' }}>
+        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+             style={{ background: 'rgba(212,233,226,0.18)', border: '1px solid rgba(212,233,226,0.30)' }}>
+          <Bot size={16} style={{ color: '#d4e9e2' }} />
+        </div>
+        <div>
+          <p className="text-white text-sm font-bold leading-tight">Consejero Académico IA</p>
+          <p className="text-white/45 text-[0.65rem]">Pregúntame sobre tu rendimiento</p>
+        </div>
+      </div>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            key="chat"
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-            className="fixed bottom-6 right-6 w-80 sm:w-96 bg-white rounded-2xl shadow-modal border border-usb-border flex flex-col z-50"
-            style={{ maxHeight: '70vh' }}
-          >
-            <div className="bg-ar-navy px-4 py-3 flex items-center justify-between flex-shrink-0 rounded-t-2xl">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-ar-cyan/20 border border-ar-cyan/30 flex items-center justify-center">
-                  <Bot size={16} className="text-ar-cyan" />
-                </div>
-                <div>
-                  <p className="text-white text-xs font-bold">Consejero Virtual</p>
-                  <p className="text-white/40 text-[0.65rem]">Pregúntame sobre tu rendimiento</p>
-                </div>
-              </div>
-              <button onClick={() => setOpen(false)} className="text-white/40 hover:text-white transition-colors p-1">
-                <X size={16} />
-              </button>
+      {/* Messages */}
+      <div className="flex flex-col gap-3 p-4 max-h-80 overflow-y-auto bg-usb-canvas">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex items-end gap-2 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+              m.role === 'bot' ? 'bg-ar-cyan/15 border border-ar-cyan/25' : 'bg-ar-navy'
+            }`}>
+              {m.role === 'bot'
+                ? <Bot size={13} className="text-ar-cyan" />
+                : <User size={13} className="text-white" />}
             </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-usb-canvas">
-              {messages.map((m, i) => (
-                <div key={i} className={`flex items-end gap-2 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    m.role === 'bot' ? 'bg-ar-cyan/20 border border-ar-cyan/30' : 'bg-ar-navy'
-                  }`}>
-                    {m.role === 'bot' ? <Bot size={13} className="text-ar-cyan" /> : <User size={13} className="text-white" />}
-                  </div>
-                  <div className={`max-w-[78%] px-3 py-2 rounded-2xl text-xs leading-relaxed ${
-                    m.role === 'bot'
-                      ? 'bg-white border border-usb-border text-usb-subtle rounded-bl-none'
-                      : 'bg-ar-navy text-white rounded-br-none'
-                  }`}>
-                    {m.text.split(/\*\*(.*?)\*\*/g).map((part, j) =>
-                      j % 2 === 1
-                        ? <strong key={j} className="font-semibold">{part}</strong>
-                        : <span key={j} className="whitespace-pre-wrap">{part}</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {loading && (
-                <div className="flex items-end gap-2">
-                  <div className="w-7 h-7 rounded-full bg-ar-cyan/20 border border-ar-cyan/30 flex items-center justify-center">
-                    <Bot size={13} className="text-ar-cyan" />
-                  </div>
-                  <div className="bg-white border border-usb-border rounded-2xl rounded-bl-none px-4 py-3">
-                    <div className="flex gap-1">
-                      {[0,1,2].map(i => (
-                        <div key={i} className="w-1.5 h-1.5 rounded-full bg-usb-faint animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                      ))}
-                    </div>
-                  </div>
-                </div>
+            <div className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-[0.78rem] leading-relaxed ${
+              m.role === 'bot'
+                ? 'bg-white border border-usb-border text-usb-subtle rounded-bl-none'
+                : 'bg-ar-navy text-white rounded-br-none'
+            }`}>
+              {m.text.split(/\*\*(.*?)\*\*/g).map((part, j) =>
+                j % 2 === 1
+                  ? <strong key={j} className="font-semibold">{part}</strong>
+                  : <span key={j} className="whitespace-pre-wrap">{part}</span>
               )}
-              <div ref={endRef} />
             </div>
-
-            <div className="border-t border-usb-border p-3 flex gap-2 bg-white flex-shrink-0 rounded-b-2xl">
-              <input
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && send()}
-                placeholder="Escribe tu pregunta…"
-                className="flex-1 bg-usb-canvas border border-usb-border rounded-full px-4 py-2 text-xs text-usb-text placeholder-usb-faint focus:outline-none focus:border-ar-cyan focus:ring-1 focus:ring-ar-cyan/30 transition-all"
-              />
-              <button
-                onClick={send}
-                disabled={!input.trim() || loading}
-                className="w-9 h-9 rounded-full bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-40 flex items-center justify-center transition-all"
-              >
-                <Send size={14} className="text-white" />
-              </button>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex items-end gap-2">
+            <div className="w-7 h-7 rounded-full bg-ar-cyan/15 border border-ar-cyan/25 flex items-center justify-center">
+              <Bot size={13} className="text-ar-cyan" />
             </div>
-          </motion.div>
+            <div className="bg-white border border-usb-border rounded-2xl rounded-bl-none px-4 py-3">
+              <div className="flex gap-1">
+                {[0,1,2].map(i => (
+                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-usb-faint animate-bounce"
+                       style={{ animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
-    </>
-  )
-}
+        <div ref={endRef} />
+      </div>
 
-// ─── Simple markdown renderer (bold + bullets + hr) ─────────────────────────
-function MarkdownText({ text }: { text: string }) {
-  const lines = text.split('\n')
-  return (
-    <div className="space-y-1 text-sm text-usb-subtle leading-relaxed">
-      {lines.map((line, i) => {
-        if (line.trim() === '---') {
-          return <hr key={i} className="border-usb-border my-2" />
-        }
-
-        // Parse **bold** inline
-        const parts = line.split(/\*\*(.*?)\*\*/g)
-        const rendered = parts.map((part, j) =>
-          j % 2 === 1
-            ? <strong key={j} className="font-semibold text-usb-text">{part}</strong>
-            : <span key={j}>{part}</span>
-        )
-
-        if (!line.trim()) return <div key={i} className="h-2" />
-        return <p key={i}>{rendered}</p>
-      })}
+      {/* Input */}
+      <div className="border-t border-usb-border p-3 flex gap-2 bg-white">
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && void send()}
+          placeholder="Escribe tu pregunta…"
+          className="flex-1 bg-usb-canvas border border-usb-border rounded-full px-4 py-2 text-xs text-usb-text placeholder-usb-faint focus:outline-none focus:border-ar-cyan focus:ring-1 focus:ring-ar-cyan/30 transition-all"
+        />
+        <button
+          onClick={() => void send()}
+          disabled={!input.trim() || loading}
+          className="w-9 h-9 rounded-full bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-40 flex items-center justify-center transition-all"
+        >
+          <Send size={14} className="text-white" />
+        </button>
+      </div>
     </div>
   )
 }
 
-// ─── Math modal ───────────────────────────────────────────────────────────────
-function MathModal({ result, onClose }: { result: PredictionResult; onClose: () => void }) {
-  const d = result.detalles_matematicos
-  const featureNames = ['Asistencia', 'Seguimiento', 'Parcial 1', 'Inicios Sesión', 'Tutorías']
+// ─── AI Analysis card ─────────────────────────────────────────────────────────
 
-  // Support both backend formats:
-  // Old: coeficientes = number[], features_scaled = number[]
-  // New: coeficientes = { variable, coeficiente, valor, contribucion }[]
-  type NewCoef = { variable: string; coeficiente: number; valor: number; contribucion: number }
-  const isNewFormat = d.coeficientes.length > 0 && typeof d.coeficientes[0] === 'object'
+function AIAnalysis({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const lines = text.split('\n').filter(l => l.trim())
+  const preview = lines.slice(0, 4).join('\n')
+  const hasMore = lines.length > 4
 
-  const rows = featureNames.map((name, i) => {
-    if (isNewFormat) {
-      const coef = d.coeficientes[i] as NewCoef | undefined
-      return {
-        name:    coef?.variable ?? name,
-        scaled:  coef?.valor ?? 0,
-        coef:    coef?.coeficiente ?? 0,
-        impact:  coef?.contribucion ?? 0,
-      }
-    }
-    const scaled  = (d.features_scaled ?? [])[i] ?? 0
-    const coefNum = d.coeficientes[i] as number ?? 0
-    return { name, scaled, coef: coefNum, impact: scaled * coefNum }
-  })
+  function renderText(str: string) {
+    return str.split(/\*\*(.*?)\*\*/g).map((part, j) =>
+      j % 2 === 1
+        ? <strong key={j} className="font-semibold text-usb-text">{part}</strong>
+        : <span key={j}>{part}</span>
+    )
+  }
+
+  return (
+    <div>
+      <div className="space-y-1 text-sm text-usb-subtle leading-relaxed">
+        {(expanded ? lines : lines.slice(0, 4)).map((line, i) => (
+          <p key={i}>{renderText(line)}</p>
+        ))}
+      </div>
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="mt-2 flex items-center gap-1 text-xs font-bold hover:underline"
+          style={{ color: 'var(--green-accent)' }}
+        >
+          {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          {expanded ? 'Ver menos' : 'Ver análisis completo'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── Recommendations ─────────────────────────────────────────────────────────
+
+function Recommendations({ form, nivel }: { form: FormData; nivel: string }) {
+  const recs: { icon: React.ReactNode; title: string; text: string; good: boolean }[] = []
+
+  if (form.asistencia < 80)
+    recs.push({ icon: <TrendingUp size={14} />, title: 'Mejora tu asistencia', text: `Tienes ${form.asistencia}% de asistencia. Apunta al 90%+ — cada clase perdida acumula riesgo.`, good: false })
+  else
+    recs.push({ icon: <CheckCircle2 size={14} />, title: '¡Buena asistencia!', text: `Tu ${form.asistencia}% es sólido. Mantén la constancia hasta el final del período.`, good: true })
+
+  if (form.parcial < 3.5)
+    recs.push({ icon: <TrendingDown size={14} />, title: 'Refuerza tu nota parcial', text: `${form.parcial}/5.0 en parciales es un área crítica. Forma un grupo de estudio y usa las tutorías.`, good: false })
+
+  if (form.seguimiento < 3.5)
+    recs.push({ icon: <MinusIcon size={14} />, title: 'Participa más en clase', text: `Seguimiento de ${form.seguimiento}/5.0. Entrega tareas a tiempo, participa en foros y debates.`, good: false })
+
+  if (form.logins < 20)
+    recs.push({ icon: <TrendingUp size={14} />, title: 'Usa más la plataforma', text: `Solo ${form.logins} inicios de sesión. Entra 3–4 veces por semana para revisar materiales y avisos.`, good: false })
+
+  if (!form.tutorias)
+    recs.push({ icon: <Lightbulb size={14} />, title: 'Aprovecha las tutorías', text: 'No estás usando tutorías. Son gratuitas y reducen significativamente el riesgo de reprobación.', good: false })
+
+  if (recs.length === 0)
+    recs.push({ icon: <CheckCircle2 size={14} />, title: '¡Excelente desempeño!', text: 'Todos tus indicadores son positivos. Mantén el ritmo y sigue así hasta el final del período.', good: true })
+
+  return (
+    <div className="space-y-2.5">
+      {recs.map((rec, i) => (
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: i * 0.08 }}
+          className={`flex items-start gap-3 p-3.5 rounded-xl border ${
+            rec.good ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
+          }`}
+        >
+          <span className={`mt-0.5 flex-shrink-0 ${rec.good ? 'text-emerald-600' : 'text-amber-600'}`}>
+            {rec.icon}
+          </span>
+          <div>
+            <p className={`text-sm font-bold ${rec.good ? 'text-emerald-700' : 'text-amber-700'}`}>{rec.title}</p>
+            <p className="text-xs mt-0.5 leading-relaxed" style={{ color: rec.good ? '#166534' : '#92400e' }}>{rec.text}</p>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Shared result cards (used in both direct and explorer modes) ─────────────
+
+// ─── Results carousel ─────────────────────────────────────────────────────────
+
+function ResultCards({
+  result, selectedCourse, finalForm,
+}: {
+  result: PredictionResult | null
+  selectedCourse: BackendCourse | null
+  finalForm: FormData
+}) {
+  const [active, setActive] = useState(0)
+  const [dir,    setDir]    = useState(1)
+
+  if (!result) return null
+
+  type Slide = { id: string; label: string; icon: React.ElementType; accent: string }
+  const slides: Slide[] = [
+    { id: 'resultado',      label: 'Resultado',       icon: BarChart2,  accent: '#00b4d8' },
+    { id: 'comparativa',    label: 'Comparativa',     icon: TrendingUp, accent: '#16a34a' },
+    { id: 'radar',          label: 'Perfil',          icon: Sparkles,   accent: '#7c3aed' },
+    { id: 'analisis',       label: 'Análisis IA',     icon: Bot,        accent: '#00b4d8' },
+    { id: 'recomendaciones',label: 'Recomendaciones', icon: Lightbulb,  accent: '#d97706' },
+  ]
+
+  const goTo = (i: number) => { setDir(i > active ? 1 : -1); setActive(i) }
+  const prev = () => { if (active > 0) goTo(active - 1) }
+  const next = () => { if (active < slides.length - 1) goTo(active + 1) }
+
+  // Drag-to-swipe support
+  const handleDragEnd = (_: unknown, info: { offset: { x: number } }) => {
+    if (info.offset.x < -50 && active < slides.length - 1) next()
+    if (info.offset.x >  50 && active > 0)               prev()
+  }
+
+  const slideContent: Record<string, React.ReactNode> = {
+    resultado: (
+      <div className="flex flex-col sm:flex-row items-center gap-6 py-2">
+        <div className="w-48 flex-shrink-0">
+          <GaugeChart pct={result.porcentaje_riesgo} nivel={result.nivel_riesgo} />
+        </div>
+        <div className="flex-1 space-y-3 text-center sm:text-left">
+          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border font-bold text-sm ${riskBgClass(result.nivel_riesgo)}`}>
+            {riskIcon(result.nivel_riesgo)} Riesgo {result.nivel_riesgo}
+          </div>
+          {selectedCourse && (
+            <p className="text-xs text-usb-faint">{selectedCourse.name}</p>
+          )}
+          <p className="text-sm text-usb-muted leading-relaxed">
+            {result.nivel_riesgo === 'BAJO' && '¡Vas muy bien! Mantén tu ritmo actual y terminarás el período con éxito.'}
+            {result.nivel_riesgo === 'MEDIO' && 'Zona de riesgo moderado. Pequeñas mejoras en tus indicadores más débiles marcan la diferencia.'}
+            {result.nivel_riesgo === 'ALTO' && 'Riesgo elevado. Actúa ahora: habla con tu profesor y usa todos los recursos disponibles.'}
+          </p>
+        </div>
+      </div>
+    ),
+    comparativa: (
+      <div>
+        <p className="text-xs text-usb-muted mb-4 leading-relaxed">
+          Compara tus indicadores con el promedio histórico de quienes aprobaron la materia.
+          <span className="text-ar-cyan font-semibold"> Azul</span> = tus datos ·
+          <span className="text-emerald-600 font-semibold"> Verde</span> = referencia de éxito.
+        </p>
+        <CompareBar
+          labels={result.datos_radar.labels}
+          studentVals={result.datos_radar.estudiante}
+          avgVals={result.datos_radar.promedio_aprobado}
+        />
+      </div>
+    ),
+    radar: (
+      <div>
+        <p className="text-xs text-usb-muted mb-4 leading-relaxed">
+          Radar de tus 5 dimensiones académicas. Cuanto más cerca de la línea verde, mejor posicionado estás para aprobar.
+        </p>
+        <div className="max-w-sm mx-auto">
+          <RadarChart datos={result.datos_radar} />
+        </div>
+      </div>
+    ),
+    analisis: (
+      <div>
+        <AIAnalysis text={result.analisis_ia} />
+      </div>
+    ),
+    recomendaciones: (
+      <div>
+        <Recommendations form={finalForm} nivel={result.nivel_riesgo} />
+      </div>
+    ),
+  }
 
   return (
     <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={onClose}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white rounded-2xl shadow-card border border-usb-border overflow-hidden"
     >
-      <motion.div
-        initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
-        transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-        onClick={e => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-modal w-full max-w-2xl max-h-[85vh] overflow-y-auto"
-      >
-        <div className="bg-ar-navy px-6 py-4 flex items-center justify-between rounded-t-2xl sticky top-0">
-          <div className="flex items-center gap-2">
-            <Calculator size={18} className="text-ar-cyan" />
-            <h3 className="text-white font-bold">Detalles Matemáticos</h3>
-          </div>
-          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors"><X size={18} /></button>
+      {/* Tab bar — scrollable on mobile */}
+      <div className="flex border-b border-usb-border overflow-x-auto scrollbar-hide">
+        {slides.map((s, i) => {
+          const Icon = s.icon
+          const isActive = i === active
+          return (
+            <button
+              key={s.id}
+              onClick={() => goTo(i)}
+              className={`flex items-center gap-1.5 px-4 py-3 text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all border-b-2 ${
+                isActive
+                  ? 'border-ar-cyan text-ar-navy bg-ar-cyan/5'
+                  : 'border-transparent text-usb-muted hover:text-usb-text hover:bg-usb-canvas'
+              }`}
+            >
+              <Icon size={13} style={{ color: isActive ? s.accent : undefined }} />
+              {s.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Slide area — draggable on mobile */}
+      <div className="overflow-hidden">
+        <AnimatePresence mode="wait" custom={dir}>
+          <motion.div
+            key={active}
+            custom={dir}
+            variants={{
+              enter:  (d: number) => ({ opacity: 0, x: d * 48 }),
+              center: { opacity: 1, x: 0 },
+              exit:   (d: number) => ({ opacity: 0, x: d * -48 }),
+            }}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.22, ease: 'easeInOut' }}
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.15}
+            onDragEnd={handleDragEnd}
+            className="p-5 sm:p-6 min-h-[320px] cursor-grab active:cursor-grabbing select-none"
+            style={{ touchAction: 'pan-y' }}
+          >
+            {slideContent[slides[active].id]}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Bottom nav: arrows + dots */}
+      <div className="flex items-center justify-between px-5 pb-4 pt-1">
+        <button
+          onClick={prev}
+          disabled={active === 0}
+          className="w-8 h-8 rounded-full border border-usb-border flex items-center justify-center text-usb-muted hover:text-usb-text hover:border-usb-faint disabled:opacity-30 transition-all"
+        >
+          <ChevronLeft size={15} />
+        </button>
+
+        <div className="flex items-center gap-1.5">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => goTo(i)}
+              className={`rounded-full transition-all duration-200 ${
+                i === active ? 'w-5 h-2 bg-ar-cyan' : 'w-2 h-2 bg-usb-border hover:bg-usb-faint'
+              }`}
+            />
+          ))}
         </div>
-        <div className="p-6 space-y-5">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-usb-canvas border-b-2 border-usb-border">
-                  {['Variable','Valor Escalado','Coeficiente','Impacto'].map(h => (
-                    <th key={h} className="px-3 py-2 text-[0.68rem] font-bold uppercase tracking-wider text-usb-muted text-center first:text-left">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ name, scaled, coef, impact }) => (
-                  <tr key={name} className="border-b border-usb-border">
-                    <td className="px-3 py-2 font-medium text-usb-subtle">{name}</td>
-                    <td className="px-3 py-2 text-center font-mono text-usb-muted">{scaled.toFixed(4)}</td>
-                    <td className="px-3 py-2 text-center font-mono text-ar-cyan font-semibold">{coef.toFixed(4)}</td>
-                    <td className={`px-3 py-2 text-center font-mono font-bold ${impact < 0 ? 'text-emerald-600' : 'text-red-500'}`}>{impact.toFixed(4)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {[
-            d.intercepto != null && { label: 'Intercepto', val: d.intercepto.toFixed(6) },
-            d.valor_z    != null && { label: 'Valor z (logit)', val: d.valor_z.toFixed(6) },
-            d.formula_logit      && { label: 'Fórmula logit', val: d.formula_logit },
-            d.calculo_logit_texto      && { label: 'Cálculo z (logit)', val: d.calculo_logit_texto },
-            d.calculo_probabilidad_texto && { label: 'Probabilidad σ(z)', val: d.calculo_probabilidad_texto },
-          ].filter(Boolean).map(item => {
-            const { label, val } = item as { label: string; val: string }
-            return (
-              <div key={label} className="bg-usb-canvas rounded-xl p-4 border border-usb-border">
-                <p className="text-xs font-bold uppercase tracking-wider text-usb-muted mb-2">{label}</p>
-                <p className="font-mono text-xs text-usb-subtle leading-relaxed break-all">{val}</p>
-              </div>
-            )
-          })}
-        </div>
-      </motion.div>
+
+        <button
+          onClick={next}
+          disabled={active === slides.length - 1}
+          className="w-8 h-8 rounded-full border border-usb-border flex items-center justify-center text-usb-muted hover:text-usb-text hover:border-usb-faint disabled:opacity-30 transition-all"
+        >
+          <ChevronRight size={15} />
+        </button>
+      </div>
     </motion.div>
   )
 }
 
+// ─── Floating chat bubble ─────────────────────────────────────────────────────
+
+function FloatingChat({ result, formData }: { result: PredictionResult | null; formData: FormData }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+      {/* Chat panel */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 360, damping: 30 }}
+            className="w-80 sm:w-96 rounded-2xl overflow-hidden"
+            style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}
+          >
+            <InlineChatBot result={result} formData={formData} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Toggle bubble */}
+      <motion.button
+        whileHover={{ scale: 1.07 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setOpen(o => !o)}
+        className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-colors"
+        style={{ background: open ? '#1a2e35' : 'var(--green-deep)', border: '2px solid rgba(212,233,226,0.25)' }}
+        aria-label="Consejero académico IA"
+      >
+        <AnimatePresence mode="wait">
+          {open
+            ? <motion.span key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
+                <X size={22} style={{ color: '#d4e9e2' }} />
+              </motion.span>
+            : <motion.span key="bot" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.15 }}>
+                <Bot size={22} style={{ color: '#d4e9e2' }} />
+              </motion.span>
+          }
+        </AnimatePresence>
+      </motion.button>
+    </div>
+  )
+}
+
+// ─── Breadcrumb ───────────────────────────────────────────────────────────────
+
+function Breadcrumb({ courseName }: { courseName?: string }) {
+  const crumbs = [
+    { label: 'Mi Progreso', to: '/' },
+    ...(courseName ? [{ label: courseName }] : [{ label: 'Predicción' }]),
+  ]
+
+  return (
+    <nav aria-label="breadcrumb" className="max-w-5xl mx-auto w-full px-5 pt-4 pb-1">
+      <ol className="flex items-center gap-1 flex-wrap">
+        {crumbs.map((crumb, i) => {
+          const isLast = i === crumbs.length - 1
+          return (
+            <li key={i} className="flex items-center gap-1">
+              {i > 0 && <ChevronRight size={12} className="text-usb-faint flex-shrink-0" />}
+              {'to' in crumb && !isLast ? (
+                <Link
+                  to={crumb.to!}
+                  className="text-xs font-medium transition-colors"
+                  style={{ color: 'var(--green-accent)' }}
+                >
+                  {crumb.label}
+                </Link>
+              ) : (
+                <span className={`text-xs font-medium ${isLast ? 'text-usb-text' : 'text-usb-muted'}`}>
+                  {crumb.label}
+                </span>
+              )}
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
+  )
+}
+
+// ─── DB grade read-only display ───────────────────────────────────────────────
+
+function GradeCard({
+  label, value, unit, color = '#00b4d8',
+}: {
+  label: string; value: number | string; unit?: string; color?: string
+}) {
+  return (
+    <div className="flex items-center justify-between py-2.5 px-3 rounded-xl border border-usb-border bg-white">
+      <span className="text-xs font-semibold text-usb-subtle">{label}</span>
+      <span
+        className="text-sm font-black tabular-nums px-2 py-0.5 rounded-lg"
+        style={{ color, background: `${color}18` }}
+      >
+        {value}{unit}
+      </span>
+    </div>
+  )
+}
+
+// ─── Corte section card ───────────────────────────────────────────────────────
+
+function CorteSection({
+  number, hasData, accentColor, children,
+}: {
+  number: number
+  hasData: boolean
+  accentColor: string
+  children?: React.ReactNode
+}) {
+  return (
+    <div
+      className="rounded-xl p-3 flex flex-col gap-2"
+      style={{
+        background: hasData ? `${accentColor}08` : 'var(--canvas-warm)',
+        border: hasData
+          ? `1px solid ${accentColor}35`
+          : '1px dashed #cbd5e1',
+      }}
+    >
+      {/* Corte header */}
+      <div className="flex items-center gap-1.5">
+        <span
+          className="w-5 h-5 rounded-full flex items-center justify-center text-[0.6rem] font-black flex-shrink-0"
+          style={{ background: `${accentColor}20`, color: accentColor }}
+        >
+          {number}
+        </span>
+        <span className="text-xs font-bold" style={{ color: accentColor }}>
+          Corte {number}
+        </span>
+        <span
+          className="ml-auto text-[0.58rem] font-semibold px-1.5 py-0.5 rounded-full"
+          style={{
+            background: hasData ? `${accentColor}18` : '#f1f5f9',
+            color:      hasData ? accentColor : '#94a3b8',
+          }}
+        >
+          {hasData ? 'Registrado' : 'Pendiente'}
+        </span>
+      </div>
+
+      {/* Content */}
+      {hasData ? (
+        <div className="space-y-1.5">{children}</div>
+      ) : (
+        <div className="flex items-center justify-center min-h-[56px]">
+          <span className="text-[0.7rem] font-medium" style={{ color: '#94a3b8' }}>
+            — Sin registrar —
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Grades organised by corte ────────────────────────────────────────────────
+
+function GradesByCorte({ grades, compact = false }: { grades: FormData; compact?: boolean }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <Database size={13} className="text-emerald-600" />
+        <h3 className="font-semibold text-usb-text text-sm">Notas registradas en el sistema</h3>
+      </div>
+
+      <div className={`grid gap-2.5 ${compact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-3'}`}>
+        {/* ── Corte 1 — has real data ── */}
+        <CorteSection number={1} hasData accentColor="#059669">
+          <GradeCard label="Parcial"      value={grades.parcial.toFixed(2)}     unit="/5" color="#7c3aed" />
+          <GradeCard label="Asistencia"   value={grades.asistencia.toFixed(1)}  unit="%" color="var(--green-accent)" />
+          <GradeCard label="Seguimiento"  value={grades.seguimiento.toFixed(2)} unit="/5" color="#00b4d8" />
+          <GradeCard label="Sesiones LMS" value={grades.logins}                 color="#d97706" />
+          <div className={`flex items-center justify-between py-2.5 px-3 rounded-xl border bg-white ${
+            grades.tutorias ? 'border-emerald-200' : 'border-usb-border'
+          }`}>
+            <span className="text-xs font-semibold text-usb-subtle">Tutorías</span>
+            <span className={`text-sm font-black ${grades.tutorias ? 'text-emerald-600' : 'text-usb-muted'}`}>
+              {grades.tutorias ? '✅ Sí' : '❌ No'}
+            </span>
+          </div>
+        </CorteSection>
+
+        {/* ── Corte 2 — pending ── */}
+        <CorteSection number={2} hasData={false} accentColor="#64748b" />
+
+        {/* ── Corte 3 — pending ── */}
+        <CorteSection number={3} hasData={false} accentColor="#64748b" />
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function Prediccion() {
   const { user } = useAuth()
-  const { courseList, grades } = useGrades()
+  const [searchParams] = useSearchParams()
+  const urlCourseId = searchParams.get('courseId') ?? ''
 
-  // Courses the student is enrolled in
-  const myCourses = useMemo(
-    () => courseList.filter(c => c.studentIds.includes(user?.studentId ?? '')),
-    [courseList, user?.studentId]
-  )
+  // ── Load enrolled courses + enrollments (with grades) from backend ──────────
+  const studentId = user?.studentId ?? user?.id ?? ''
+  const [enrolledCourses, setEnrolledCourses]       = useState<BackendCourse[]>([])
+  const [enrollmentMap,   setEnrollmentMap]          = useState<Map<string, BackendEnrollment>>(new Map())
+  const [coursesLoading,  setCoursesLoading]         = useState(true)
 
-  const [selectedCourseId, setSelectedCourseId] = useState<string>('')
-  const [result, setResult] = useState<PredictionResult | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  useEffect(() => {
+    if (!studentId) { setCoursesLoading(false); return }
+    void (async () => {
+      try {
+        const enrollments = await enrollmentService.listByStudent(studentId)
+        const active = enrollments.filter(e => e.status === 'ACTIVE')
+
+        // Build course_id → enrollment map for grade lookup
+        const map = new Map<string, BackendEnrollment>()
+        active.forEach(e => map.set(e.course_id, e))
+        setEnrollmentMap(map)
+
+        const settled = await Promise.allSettled(active.map(e => courseService.getById(e.course_id)))
+        setEnrolledCourses(
+          settled
+            .filter((r): r is PromiseFulfilledResult<BackendCourse> => r.status === 'fulfilled')
+            .map(r => r.value)
+        )
+      } catch { /* ignore */ } finally {
+        setCoursesLoading(false)
+      }
+    })()
+  }, [studentId])
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(urlCourseId)
+  const [result, setResult]     = useState<PredictionResult | null>(null)
+  const [predLoading, setPredLoading] = useState(false)
+  const [error, setError]       = useState('')
   const [showMath, setShowMath] = useState(false)
+
+  // Manual fallback inputs (used only when DB grades are null)
+  const [asistencia,  setAsistencia]  = useState(85)
+  const [seguimiento, setSeguimiento] = useState(3.5)
+  const [parcial,     setParcial]     = useState(3.2)
+  const [logins,      setLogins]      = useState(42)
+  const [tutorias,    setTutorias]    = useState(true)
+
   const resultsRef = useRef<HTMLDivElement>(null)
 
-  // Initialize selector to first course
+  const selectedCourse     = enrolledCourses.find(c => c.id === selectedCourseId) ?? null
+  const selectedEnrollment = selectedCourseId ? enrollmentMap.get(selectedCourseId) ?? null : null
+
+  // Detect if we have complete grades from DB for the selected course
+  const dbGrades = selectedEnrollment && (
+    selectedEnrollment.asistencia      != null &&
+    selectedEnrollment.seguimiento     != null &&
+    selectedEnrollment.nota_parcial_1  != null &&
+    selectedEnrollment.logins          != null &&
+    selectedEnrollment.uso_tutorias    != null
+  ) ? {
+    asistencia:  Number(selectedEnrollment.asistencia),
+    seguimiento: Number(selectedEnrollment.seguimiento),
+    parcial:     Number(selectedEnrollment.nota_parcial_1),
+    logins:      Number(selectedEnrollment.logins),
+    tutorias:    Boolean(selectedEnrollment.uso_tutorias),
+  } : null
+
+  // Resolved form values: DB grades take priority over manual sliders
+  const finalForm: FormData = dbGrades ?? { asistencia, seguimiento, parcial, logins, tutorias }
+
+  // Pre-select from URL param or first course
   useEffect(() => {
-    if (myCourses.length > 0 && !selectedCourseId) {
-      setSelectedCourseId(myCourses[0].id)
+    if (enrolledCourses.length === 0) return
+    if (urlCourseId && enrolledCourses.find(c => c.id === urlCourseId)) {
+      setSelectedCourseId(urlCourseId)
+    } else if (!selectedCourseId) {
+      setSelectedCourseId(enrolledCourses[0].id)
     }
-  }, [myCourses, selectedCourseId])
+  }, [enrolledCourses, urlCourseId, selectedCourseId])
 
-  const selectedCourse = myCourses.find(c => c.id === selectedCourseId) ?? null
-
-  // Derive form from selected course
-  const form = useMemo(
-    () => selectedCourse
-      ? deriveFromCourse(user?.studentId ?? '', selectedCourse, grades)
-      : { asistencia: 85, seguimiento: 3.5, parcial: 3.2, logins: 42, tutorias: true },
-    [user?.studentId, selectedCourse, grades]
-  )
-
-  const [logins, setLogins] = useState(42)
-  const [tutorias, setTutorias] = useState(true)
-
-  // Merge manual inputs with derived form
-  const finalForm: FormData = { ...form, logins, tutorias }
-
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedCourse) return
-    setLoading(true)
+  // ── Core predict function ──────────────────────────────────────────────────
+  const runPrediction = useCallback(async (form: FormData, course: BackendCourse) => {
+    setPredLoading(true)
     setError('')
+    setResult(null)
 
     try {
       const data = await predictionService.predict({
-        promedio_asistencia:        finalForm.asistencia,
-        promedio_seguimiento:       finalForm.seguimiento,
-        nota_parcial_1:             finalForm.parcial,
-        inicios_sesion_plataforma:  finalForm.logins,
-        uso_tutorias:               finalForm.tutorias ? 1 : 0,
+        promedio_asistencia:       form.asistencia,
+        promedio_seguimiento:      form.seguimiento,
+        nota_parcial_1:            form.parcial,
+        inicios_sesion_plataforma: form.logins,
+        uso_tutorias:              form.tutorias ? 1 : 0,
       }, user?.studentId)
-      setResult(data as unknown as PredictionResult)
-      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
 
-      // Notify professor when student has HIGH risk
-      if ((data as unknown as PredictionResult).nivel_riesgo === 'ALTO' && selectedCourse) {
+      setResult(data as unknown as PredictionResult)
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+
+      // Notify professor for HIGH risk
+      if ((data as unknown as PredictionResult).nivel_riesgo === 'ALTO') {
         void (async () => {
           try {
-            const professor = await courseService.getCourseProf(selectedCourse.id)
+            const professor = await courseService.getCourseProf(course.id)
             await notificationService.sendRiskAlert({
               student_name:    user?.name ?? 'Estudiante',
               student_email:   user?.email ?? '',
               professor_email: professor.email,
               professor_name:  professor.full_name,
               risk_level:      'ALTO',
-              course_name:     selectedCourse.name,
+              course_name:     course.name,
             })
-          } catch {
-            // Notification failure is non-critical — silently ignore
-          }
+          } catch { /* non-critical */ }
         })()
       }
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        setError('La petición tardó demasiado. El servidor puede estar iniciando (30–50 s). Intenta de nuevo.')
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          setError('La petición tardó demasiado. El servidor puede estar iniciando. Intenta de nuevo.')
+        } else if (err.message.toLowerCase().includes('consentimiento') || err.message.includes('403')) {
+          setError('Necesitas aceptar los términos de uso del predictor antes de continuar.')
+        } else {
+          setError(`Error: ${err.message}`)
+        }
       } else {
-        setError('No se pudo conectar con el servidor. Verifica tu conexión o que el backend esté corriendo.')
+        setError('No se pudo conectar con el servidor. Verifica tu conexión.')
       }
     } finally {
-      setLoading(false)
+      setPredLoading(false)
     }
-  }, [finalForm, selectedCourse])
+  }, [user])
 
-  const reset = () => {
-    setResult(null)
-    setError('')
-  }
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedCourse) return
+    await runPrediction(finalForm, selectedCourse)
+  }, [finalForm, selectedCourse, runPrediction])
+
+  const reset = () => { setResult(null); setError('') }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-usb-canvas flex flex-col">
       <Header />
 
-      {/* Page title */}
-      <div className="bg-ar-navy border-b border-white/10 px-5 py-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center gap-3 mb-1">
-            <BarChart2 size={20} className="text-ar-cyan" />
-            <h1 className="text-white font-black text-2xl tracking-tight">
-              Predicción Académica
-            </h1>
+      {/* Profile strip */}
+      <div className="relative overflow-hidden"
+           style={{ background: 'var(--green-deep)', borderBottom: '1px solid rgba(0,0,0,0.25)' }}>
+        <div className="max-w-5xl mx-auto px-5 py-5 flex items-center gap-4">
+          <div
+            className="w-11 h-11 rounded-full flex items-center justify-center font-black text-sm flex-shrink-0"
+            style={{
+              background: 'linear-gradient(135deg, rgba(212,233,226,0.25) 0%, rgba(0,117,74,0.30) 100%)',
+              border: '2px solid rgba(212,233,226,0.35)',
+              color: '#d4e9e2',
+            }}
+          >
+            {(user?.name ?? 'ES').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
           </div>
-          <p className="text-white/50 text-sm">
-            Selecciona una materia y calcula tu nivel de riesgo académico con inteligencia artificial.
-          </p>
+          <div className="min-w-0">
+            <p className="text-white font-extrabold text-base leading-tight truncate" style={{ letterSpacing: '-0.01em' }}>
+              {user?.name ?? 'Estudiante'}
+            </p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <GraduationCap size={11} style={{ color: 'rgba(212,233,226,0.55)' }} />
+              <p className="text-xs truncate" style={{ color: 'rgba(212,233,226,0.55)' }}>
+                {selectedCourse ? `Analizando: ${selectedCourse.name}` : 'Predicción de riesgo académico con IA'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-5 py-8">
-        <div className="grid lg:grid-cols-5 gap-6">
+      {/* Breadcrumb */}
+      <Breadcrumb courseName={selectedCourse?.name} />
 
-          {/* ── Form column ─────────────────────────────────────────────── */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-card border border-usb-border p-6 sticky top-20">
+      {/* ═══════════════════════════════════════════════════════════════════
+          DIRECT MODE — arrived via ?courseId=xxx from a course card
+          Single focused layout: course info + grades + Calcular + results
+          ═══════════════════════════════════════════════════════════════════ */}
+      {urlCourseId ? (
+        <main className="flex-1 max-w-2xl mx-auto w-full px-5 pt-4 pb-8 space-y-4">
 
-              {/* Step 1 — course selector */}
-              <div className="mb-6">
-                <h2 className="font-bold text-usb-text mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-ar-cyan text-white flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
-                  Selecciona tu materia
-                </h2>
+          {/* Course info banner */}
+          {coursesLoading ? (
+            <div className="bg-white rounded-2xl shadow-card border border-usb-border p-8 flex justify-center">
+              <Loader2 size={28} className="animate-spin text-ar-cyan" />
+            </div>
+          ) : selectedCourse ? (
+            <div className="bg-white rounded-2xl shadow-card border border-usb-border p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-ar-cyan/10 flex items-center justify-center flex-shrink-0">
+                <BookOpen size={22} className="text-ar-cyan" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-bold text-usb-text text-base leading-tight">{selectedCourse.name}</h2>
+                <p className="text-xs text-usb-faint mt-0.5">{selectedCourse.code} · {selectedCourse.credits} créditos</p>
+              </div>
+            </div>
+          ) : null}
 
-                {myCourses.length === 0 ? (
-                  <div className="bg-usb-canvas rounded-xl border border-usb-border p-4 text-center">
-                    <BookOpen size={20} className="text-usb-faint mx-auto mb-2" />
-                    <p className="text-usb-muted text-xs">No estás inscrito en materias</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {myCourses.map(course => (
-                      <button
-                        key={course.id}
-                        type="button"
-                        onClick={() => { setSelectedCourseId(course.id); setResult(null) }}
-                        className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between gap-2 ${
-                          selectedCourseId === course.id
-                            ? 'border-ar-cyan bg-ar-cyan/5 shadow-sm'
-                            : 'border-usb-border bg-usb-canvas hover:border-ar-cyan/40'
-                        }`}
-                      >
-                        <div>
-                          <p className={`text-sm font-semibold leading-tight ${selectedCourseId === course.id ? 'text-ar-navy' : 'text-usb-subtle'}`}>
-                            {course.name}
-                          </p>
-                          <p className="text-[0.65rem] text-usb-faint mt-0.5">
-                            {course.code} · {course.group} · {course.semester}
-                          </p>
+          {/* Grades by corte (read-only, from DB) */}
+          {dbGrades && selectedCourse && (
+            <div className="bg-white rounded-2xl shadow-card border border-usb-border p-5">
+              <GradesByCorte grades={dbGrades} />
+            </div>
+          )}
+
+          {/* Calcular button — only before results */}
+          {selectedCourse && !predLoading && !result && (
+            <motion.button
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={() => void runPrediction(finalForm, selectedCourse)}
+              className="w-full flex items-center justify-center gap-2.5 bg-ar-cyan hover:bg-ar-cyan-dark text-white font-bold py-4 rounded-2xl transition-all shadow-glow hover:shadow-lg text-base"
+            >
+              <Sparkles size={18} />
+              Calcular predicción
+            </motion.button>
+          )}
+
+          {/* Recalculate after results */}
+          {result && !predLoading && selectedCourse && (
+            <button
+              onClick={() => { reset(); void runPrediction(finalForm, selectedCourse) }}
+              className="w-full flex items-center justify-center gap-2 border border-usb-border text-usb-muted hover:text-usb-text hover:border-ar-cyan/40 font-medium py-2.5 rounded-xl transition-all text-sm"
+            >
+              <RotateCcw size={13} />
+              Recalcular
+            </button>
+          )}
+
+          {/* Error */}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3"
+              >
+                <AlertTriangle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
+                <p className="text-red-600 text-sm leading-relaxed">{error}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Loading */}
+          {predLoading && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="bg-white rounded-2xl shadow-card border border-usb-border p-12 flex flex-col items-center"
+            >
+              <div className="relative mb-6">
+                <Loader2 size={44} className="text-ar-cyan animate-spin" />
+                <div className="absolute inset-0 rounded-full blur-xl opacity-30 bg-ar-cyan animate-pulse" />
+              </div>
+              <p className="font-bold text-usb-text text-lg mb-1">Analizando tu perfil…</p>
+              <p className="text-usb-muted text-sm">El modelo de IA está procesando tus datos</p>
+            </motion.div>
+          )}
+
+          {/* Results — reuse the same cards as explorer mode */}
+          <div ref={resultsRef} className="space-y-4">
+            <ResultCards result={result} selectedCourse={selectedCourse ?? null} finalForm={finalForm} />
+          </div>
+        </main>
+
+      ) : (
+        /* ═══════════════════════════════════════════════════════════════════
+           EXPLORER MODE — direct /prediccion navigation (no courseId)
+           Two-column layout: course selector + results
+           ═══════════════════════════════════════════════════════════════════ */
+        <main className="flex-1 max-w-5xl mx-auto w-full px-5 pt-4 pb-8">
+          <div className="grid lg:grid-cols-5 gap-6">
+
+            {/* ── Form column ─────────────────────────────────────────────── */}
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-2xl shadow-card border border-usb-border p-6 sticky top-20">
+
+                {/* Course selector */}
+                <div className="mb-6">
+                  <h2 className="font-bold text-usb-text mb-3 flex items-center gap-2 text-sm">
+                    <span className="w-6 h-6 rounded-full bg-ar-cyan text-white flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                    Selecciona tu materia
+                  </h2>
+
+                  {coursesLoading ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 size={20} className="animate-spin text-ar-cyan" />
+                    </div>
+                  ) : enrolledCourses.length === 0 ? (
+                    <div className="bg-usb-canvas rounded-xl border border-usb-border p-4 text-center">
+                      <BookOpen size={20} className="text-usb-faint mx-auto mb-2" />
+                      <p className="text-usb-muted text-xs">No tienes materias activas inscritas</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {enrolledCourses.map(course => (
+                        <button
+                          key={course.id}
+                          type="button"
+                          onClick={() => { setSelectedCourseId(course.id); setResult(null) }}
+                          className={`w-full text-left px-3.5 py-3 rounded-xl border-2 transition-all flex items-center justify-between gap-2 ${
+                            selectedCourseId === course.id
+                              ? 'border-ar-cyan bg-ar-cyan/5 shadow-sm'
+                              : 'border-usb-border bg-usb-canvas hover:border-ar-cyan/40'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className={`text-sm font-semibold leading-tight truncate ${selectedCourseId === course.id ? 'text-ar-navy' : 'text-usb-subtle'}`}>
+                              {course.name}
+                            </p>
+                            <p className="text-[0.65rem] text-usb-faint mt-0.5">{course.code} · {course.credits} créditos</p>
+                          </div>
+                          {selectedCourseId === course.id && (
+                            <div className="w-2 h-2 rounded-full bg-ar-cyan flex-shrink-0" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Indicators */}
+                {selectedCourse && (
+                  <form onSubmit={e => void handleSubmit(e)}>
+                    <h2 className="font-bold text-usb-text mb-3 flex items-center gap-2 text-sm">
+                      <span className="w-6 h-6 rounded-full bg-ar-cyan/20 text-ar-cyan flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                      Indicadores académicos
+                    </h2>
+
+                    {dbGrades ? (
+                      <div className="space-y-3 mb-5">
+                        <GradesByCorte grades={dbGrades} compact />
+                        <button type="submit" disabled={predLoading}
+                          className="w-full flex items-center justify-center gap-2 bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-60 text-white font-bold py-3.5 rounded-full transition-all shadow-glow"
+                        >
+                          {predLoading ? <><Loader2 size={15} className="animate-spin" /> Calculando…</> : <><Sparkles size={15} /> Calcular predicción</>}
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-[0.68rem] text-usb-faint mb-3 flex items-center gap-1">
+                          <Info size={10} /> Sin notas en el sistema. Introduce valores manualmente.
+                        </p>
+                        <Slider label="Asistencia" value={asistencia} onChange={setAsistencia} min={0} max={100} step={1} unit="%" color="var(--green-accent)" />
+                        <Slider label="Seguimiento" value={seguimiento} onChange={setSeguimiento} min={0} max={5} step={0.1} unit="/5" color="#00b4d8" />
+                        <Slider label="Nota Parcial 1" value={parcial} onChange={setParcial} min={0} max={5} step={0.1} unit="/5" color="#7c3aed" />
+                        <Slider label="Sesiones LMS" value={logins} onChange={setLogins} min={0} max={100} step={1} unit="" color="#d97706" />
+                        <div className="mb-5">
+                          <label className="text-sm font-semibold text-usb-subtle mb-2 block">Uso de tutorías</label>
+                          <button type="button" onClick={() => setTutorias(t => !t)}
+                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-sm font-medium ${tutorias ? 'border-ar-cyan bg-ar-cyan/5 text-ar-navy' : 'border-usb-border bg-usb-canvas text-usb-muted'}`}
+                          >
+                            <span>{tutorias ? '✅ Sí, uso tutorías' : '❌ No uso tutorías'}</span>
+                            <div className={`w-10 h-5 rounded-full relative transition-colors ${tutorias ? 'bg-ar-cyan' : 'bg-usb-border'}`}>
+                              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${tutorias ? 'left-5' : 'left-0.5'}`} />
+                            </div>
+                          </button>
                         </div>
-                        {selectedCourseId === course.id && (
-                          <ChevronRight size={16} className="text-ar-cyan flex-shrink-0" />
-                        )}
+                        <button type="submit" disabled={predLoading}
+                          className="w-full flex items-center justify-center gap-2 bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-60 text-white font-bold py-3.5 rounded-full transition-all shadow-glow hover:shadow-lg"
+                        >
+                          {predLoading ? <><Loader2 size={16} className="animate-spin" /> Calculando…</> : <><Sparkles size={16} /> Calcular mi riesgo</>}
+                        </button>
+                      </>
+                    )}
+
+                    <AnimatePresence>
+                      {error && (
+                        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                          className="mt-3 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5"
+                        >
+                          <AlertTriangle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
+                          <p className="text-red-600 text-xs leading-relaxed">{error}</p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    {result && (
+                      <button type="button" onClick={reset}
+                        className="w-full flex items-center justify-center gap-1.5 text-usb-muted hover:text-usb-text text-xs font-medium mt-2 py-2 transition-colors"
+                      >
+                        <RotateCcw size={12} /> Reiniciar
                       </button>
-                    ))}
-                  </div>
+                    )}
+                  </form>
                 )}
               </div>
-
-              {/* Step 2 — grade breakdown for selected course */}
-              {selectedCourse && (
-                <div className="mb-6">
-                  <h2 className="font-bold text-usb-text mb-3 flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-ar-cyan/20 text-ar-cyan flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
-                    Calificaciones
-                  </h2>
-                  <CourseGradePanel
-                    course={selectedCourse}
-                    studentId={user?.studentId ?? ''}
-                    grades={grades}
-                  />
-                </div>
-              )}
-
-              {/* Step 3 — complementary manual inputs */}
-              {selectedCourse && (
-                <form onSubmit={handleSubmit}>
-                  <h2 className="font-bold text-usb-text mb-4 flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-ar-cyan/20 text-ar-cyan flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
-                    Datos complementarios
-                  </h2>
-
-                  <LoginsSlider value={logins} onChange={setLogins} />
-
-                  {/* Tutorías toggle */}
-                  <div className="mb-6">
-                    <label className="text-sm font-semibold text-usb-subtle mb-2 block">Uso de tutorías</label>
-                    <button
-                      type="button"
-                      onClick={() => setTutorias(t => !t)}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-sm font-medium ${
-                        tutorias
-                          ? 'border-ar-cyan bg-ar-cyan/5 text-ar-navy'
-                          : 'border-usb-border bg-usb-canvas text-usb-muted'
-                      }`}
-                    >
-                      <span>{tutorias ? '✅ Sí, uso tutorías' : '❌ No uso tutorías'}</span>
-                      <div className={`w-10 h-5 rounded-full relative transition-colors ${tutorias ? 'bg-ar-cyan' : 'bg-usb-border'}`}>
-                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${tutorias ? 'left-5' : 'left-0.5'}`} />
-                      </div>
-                    </button>
-                  </div>
-
-                  {/* Error */}
-                  <AnimatePresence>
-                    {error && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                        className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5"
-                      >
-                        <AlertTriangle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
-                        <p className="text-red-600 text-xs leading-relaxed">{error}</p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 bg-ar-cyan hover:bg-ar-cyan-dark disabled:opacity-60 text-white font-bold py-3.5 rounded-full transition-all shadow-glow hover:shadow-lg"
-                  >
-                    {loading
-                      ? <><Loader2 size={16} className="animate-spin" /> Calculando…</>
-                      : <><Sparkles size={16} /> Calcular mi riesgo</>
-                    }
-                  </button>
-
-                  {result && (
-                    <button type="button" onClick={reset}
-                      className="w-full flex items-center justify-center gap-1.5 text-usb-muted hover:text-usb-text text-xs font-medium mt-2 py-2 transition-colors"
-                    >
-                      <RotateCcw size={12} /> Reiniciar
-                    </button>
-                  )}
-                </form>
-              )}
             </div>
-          </div>
 
-          {/* ── Results column ──────────────────────────────────────────── */}
-          <div className="lg:col-span-3 space-y-5" ref={resultsRef}>
-
-            {/* Empty state */}
-            {!result && !loading && (
-              <div className="bg-white rounded-2xl shadow-card border border-usb-border p-12 flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-usb-canvas border border-usb-border flex items-center justify-center mb-4">
-                  <BarChart2 size={28} className="text-usb-faint" />
+            {/* ── Results column ──────────────────────────────────────────── */}
+            <div className="lg:col-span-3 space-y-5" ref={resultsRef}>
+              {!result && !predLoading && !selectedCourseId && (
+                <div className="bg-white rounded-2xl shadow-card border border-usb-border p-12 flex flex-col items-center text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-usb-canvas border border-usb-border flex items-center justify-center mb-4">
+                    <BarChart2 size={28} className="text-usb-faint" />
+                  </div>
+                  <p className="font-bold text-usb-text mb-1">Selecciona una materia</p>
+                  <p className="text-usb-muted text-sm">Elige la materia que quieres analizar</p>
                 </div>
-                <p className="font-bold text-usb-text mb-1">Esperando tu análisis</p>
-                <p className="text-usb-muted text-sm">
-                  {selectedCourse
-                    ? 'Presiona "Calcular mi riesgo" para obtener tu predicción'
-                    : 'Selecciona una materia para comenzar'}
-                </p>
-              </div>
-            )}
+              )}
+              {!result && !predLoading && !!selectedCourseId && !dbGrades && (
+                <div className="bg-white rounded-2xl shadow-card border border-usb-border p-12 flex flex-col items-center text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-usb-canvas border border-usb-border flex items-center justify-center mb-4">
+                    <BarChart2 size={28} className="text-usb-faint" />
+                  </div>
+                  <p className="font-bold text-usb-text mb-1">Ajusta tus indicadores</p>
+                  <p className="text-usb-muted text-sm">Mueve los controles y presiona "Calcular mi riesgo"</p>
+                </div>
+              )}
 
             {/* Loading */}
-            {loading && (
-              <div className="bg-white rounded-2xl shadow-card border border-usb-border p-12 flex flex-col items-center">
-                <Loader2 size={36} className="text-ar-cyan animate-spin mb-4" />
-                <p className="font-bold text-usb-text">Calculando predicción…</p>
-                <p className="text-usb-muted text-sm mt-1">El servidor puede tardar 30–50 s si estuvo inactivo</p>
-              </div>
+            {predLoading && (
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="bg-white rounded-2xl shadow-card border border-usb-border p-12 flex flex-col items-center"
+              >
+                <div className="relative mb-6">
+                  <Loader2 size={44} className="text-ar-cyan animate-spin" />
+                  <div className="absolute inset-0 rounded-full blur-xl opacity-30 bg-ar-cyan animate-pulse" />
+                </div>
+                <p className="font-bold text-usb-text text-lg mb-1">Analizando tu perfil…</p>
+                <p className="text-usb-muted text-sm">El modelo de IA está procesando tus datos</p>
+              </motion.div>
             )}
 
             {/* Results */}
-            <AnimatePresence>
-              {result && (
-                <>
-                  {/* Gauge + risk level */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-2xl shadow-card border border-usb-border p-6"
-                  >
-                    <h3 className="font-bold text-usb-text mb-5 flex items-center gap-2 text-base">
-                      <span className="w-6 h-6 rounded-full bg-ar-cyan/20 text-ar-cyan flex items-center justify-center text-xs font-bold">2</span>
-                      Nivel de Riesgo
-                      {selectedCourse && (
-                        <span className="ml-auto text-xs font-normal text-usb-muted bg-usb-canvas border border-usb-border px-2.5 py-1 rounded-full">
-                          {selectedCourse.name}
-                        </span>
-                      )}
-                    </h3>
-                    <div className="flex flex-col sm:flex-row items-center gap-6">
-                      <div className="w-full max-w-[240px]">
-                        <GaugeChart pct={result.porcentaje_riesgo} nivel={result.nivel_riesgo} />
-                      </div>
-                      <div className="flex-1 space-y-3">
-                        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border font-bold text-sm ${riskBgClass(result.nivel_riesgo)}`}>
-                          {riskIcon(result.nivel_riesgo)}
-                          Riesgo {result.nivel_riesgo}
-                        </div>
-                        <div className="bg-usb-canvas rounded-xl p-4 border border-usb-border">
-                          <p className="text-xs text-usb-muted mb-1 font-medium">Probabilidad de aprobar</p>
-                          <p className="text-3xl font-black text-emerald-600 tabular-nums">
-                            {fmt1(100 - result.porcentaje_riesgo)}%
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => setShowMath(true)}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-ar-cyan hover:text-ar-cyan-dark transition-colors"
-                        >
-                          <Calculator size={13} /> Ver detalles matemáticos <ChevronDown size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  {/* Charts */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                    className="grid sm:grid-cols-2 gap-4"
-                  >
-                    <div className="bg-white rounded-2xl shadow-card border border-usb-border p-5">
-                      <CompareBar
-                        title="Asistencia y Plataforma"
-                        labels={['Asistencia (%)', 'Inicios Sesión']}
-                        studentVals={[finalForm.asistencia, finalForm.logins]}
-                        avgVals={[PROMEDIOS_APROBADOS.asistencia, PROMEDIOS_APROBADOS.logins]}
-                        maxY={100} stepY={20}
-                      />
-                    </div>
-                    <div className="bg-white rounded-2xl shadow-card border border-usb-border p-5">
-                      <CompareBar
-                        title="Seguimiento y Parcial"
-                        labels={['Seguimiento', 'Parcial 1']}
-                        studentVals={[finalForm.seguimiento, finalForm.parcial]}
-                        avgVals={[PROMEDIOS_APROBADOS.seguimiento, PROMEDIOS_APROBADOS.parcial]}
-                        maxY={5} stepY={1}
-                      />
-                    </div>
-                  </motion.div>
-
-                  {/* AI Analysis */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-                    className="bg-white rounded-2xl shadow-card border border-usb-border p-6"
-                  >
-                    <h3 className="font-bold text-usb-text mb-3 flex items-center gap-2">
-                      <Bot size={16} className="text-ar-cyan" />
-                      Análisis del Consejero IA
-                    </h3>
-                    <div className="bg-usb-canvas rounded-xl p-4 border border-usb-border">
-                      <MarkdownText text={result.analisis_ia} />
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
+            <ResultCards result={result} selectedCourse={selectedCourse} finalForm={finalForm} />
           </div>
         </div>
-      </main>
+        </main>
+      )}
 
-      <footer className="bg-ar-navy border-t border-white/10 py-4 text-center">
-        <p className="text-white/30 text-xs">Academic Risk · Predictor Académico IA · Período 2024-I</p>
-      </footer>
-
-      <ChatBot result={result} formData={finalForm} />
-
+      {/* ── Floating: math model button (bottom-left) ─────────────────── */}
       <AnimatePresence>
-        {showMath && result && <MathModal result={result} onClose={() => setShowMath(false)} />}
+        {result && (
+          <motion.button
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            onClick={() => setShowMath(true)}
+            className="fixed bottom-6 left-6 z-50 flex items-center gap-2 bg-white border border-usb-border shadow-lg px-3.5 py-2.5 rounded-full text-xs font-semibold text-usb-subtle hover:border-ar-cyan/50 hover:text-usb-text transition-all"
+            style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }}
+          >
+            <Calculator size={14} className="text-ar-cyan flex-shrink-0" />
+            <span className="hidden sm:inline">¿Cómo calculamos esto?</span>
+            <span className="sm:hidden">Modelo</span>
+          </motion.button>
+        )}
       </AnimatePresence>
+
+      {/* ── Floating: chat bubble (bottom-right) ──────────────────────── */}
+      <FloatingChat result={result} formData={finalForm} />
+
+      {/* Math modal */}
+      <AnimatePresence>
+        {showMath && result && (
+          <MathModal result={result} onClose={() => setShowMath(false)} />
+        )}
+      </AnimatePresence>
+
+      <footer
+        className="py-4 text-center mt-8"
+        style={{ background: 'var(--green-deep)', borderTop: '1px solid rgba(255,255,255,0.14)' }}
+      >
+        <p className="text-xs font-medium" style={{ color: 'rgba(255,255,255,0.55)' }}>
+          Academic Risk · Predictor Académico IA · {new Date().getFullYear()}
+        </p>
+      </footer>
     </div>
   )
 }

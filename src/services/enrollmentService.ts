@@ -16,6 +16,12 @@ export interface BackendEnrollment {
   status:          EnrollmentStatus
   enrollment_date: string
   updated_at:      string
+  // Academic indicator fields (null until set by a professor)
+  asistencia:      number | null
+  seguimiento:     number | null
+  nota_parcial_1:  number | null
+  logins:          number | null
+  uso_tutorias:    boolean | null
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────

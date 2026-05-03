@@ -142,17 +142,12 @@ function TeleportOverlay({ name }: { name: string }) {
             transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
           />
           <motion.div
-            className="relative z-10 w-20 h-20 rounded-2xl flex items-center justify-center"
+            className="relative z-10 w-20 h-20 rounded-2xl overflow-hidden"
             style={{ background: 'rgba(212,233,226,0.15)', border: '1px solid rgba(212,233,226,0.35)' }}
-            animate={{ scale: [1, 1.06, 1] }}
-            transition={{ duration: 1.6, ease: 'easeInOut', repeat: Infinity }}
+            animate={{ y: [0, -6, 0] }}
+            transition={{ duration: 3, ease: 'easeInOut', repeat: Infinity }}
           >
-            <span
-              className="font-black select-none"
-              style={{ color: 'var(--green-light)', fontSize: '1.8rem', letterSpacing: '-0.06em' }}
-            >
-              AR
-            </span>
+            <img src="/assets/ar-icon.png" alt="Academic Risk" className="w-full h-full object-contain" />
           </motion.div>
         </div>
 
@@ -397,17 +392,12 @@ export default function LoginPage() {
             transition={{ delay: 0.35, duration: 0.6 }}
             className="relative z-10 flex items-center gap-3.5"
           >
-            {/* "AR" logomark — clean, no spinning */}
+            {/* Logo PNG */}
             <div
-              className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+              className="w-12 h-12 rounded-2xl overflow-hidden flex-shrink-0"
               style={{ background: 'rgba(212,233,226,0.18)', border: '1px solid rgba(212,233,226,0.40)' }}
             >
-              <span
-                className="font-black select-none"
-                style={{ color: 'var(--green-light)', fontSize: '1rem', letterSpacing: '-0.04em' }}
-              >
-                AR
-              </span>
+              <img src="/assets/ar-icon.png" alt="Academic Risk" className="w-full h-full object-contain" />
             </div>
             <div>
               <p
@@ -549,15 +539,10 @@ export default function LoginPage() {
               className="relative z-10 flex flex-col items-center gap-3"
             >
               <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                className="w-14 h-14 rounded-2xl overflow-hidden"
                 style={{ background: 'rgba(212,233,226,0.18)', border: '1px solid rgba(212,233,226,0.40)' }}
               >
-                <span
-                  className="font-black select-none"
-                  style={{ color: 'var(--green-light)', fontSize: '1.2rem', letterSpacing: '-0.04em' }}
-                >
-                  AR
-                </span>
+                <img src="/assets/ar-icon.png" alt="Academic Risk" className="w-full h-full object-contain" />
               </div>
               <div>
                 <p className="text-white font-black text-xl" style={{ letterSpacing: '-0.02em' }}>
