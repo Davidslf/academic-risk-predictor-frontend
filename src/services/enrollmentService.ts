@@ -35,6 +35,16 @@ export interface BackendGradesRead {
   final_grade:         number | null
 }
 
+// ─── Input DTOs ──────────────────────────────────────────────────────────────
+
+export interface IndicatorsUpdateInput {
+  asistencia?:     number | null
+  seguimiento?:    number | null
+  nota_parcial_1?: number | null
+  logins?:         number | null
+  uso_tutorias?:   boolean | null
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const enrollmentService = {
@@ -65,5 +75,16 @@ export const enrollmentService = {
    */
   async getGrades(enrollmentId: string): Promise<BackendGradesRead> {
     return api.get<BackendGradesRead>(`/enrollments/${enrollmentId}/grades`)
+  },
+
+  /**
+   * Update flat indicator columns for an enrollment.
+   * PROFESSOR can only update enrollments in their own courses.
+   */
+  async updateIndicators(
+    enrollmentId: string,
+    body: IndicatorsUpdateInput,
+  ): Promise<BackendEnrollment> {
+    return api.patch<BackendEnrollment>(`/enrollments/${enrollmentId}/indicators`, body)
   },
 }

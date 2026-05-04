@@ -1,8 +1,7 @@
-import { useState, useEffect, Component, type ReactNode } from 'react'
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import { Component, type ReactNode } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from './context/AuthContext'
-import { useGrades } from './context/GradesContext'
 import LoginPage from './pages/Login'
 import Prediccion from './pages/Prediccion'
 import MisMaterias from './pages/MisMaterias'
@@ -10,7 +9,6 @@ import MateriaDetalle from './pages/MateriaDetalle'
 import Dashboard from './pages/Dashboard'
 import GradesPage from './pages/Grades'
 import AdminPage from './pages/Admin'
-import EstadisticasProfesor from './pages/EstadisticasProfesor'
 
 // ─── Error Boundary ──────────────────────────────────────────────────────────
 interface EBState { hasError: boolean; message: string }
@@ -73,82 +71,6 @@ function RoleHome() {
   return <Navigate to="/" replace />
 }
 
-// ─── Professor page components ───────────────────────────────────────────────
-function ProfessorDashboard() {
-  const navigate = useNavigate()
-  const { user, logout } = useAuth()
-  const { courseList, grades, refreshCourses, setSelectedCourseId } = useGrades()
-
-  useEffect(() => {
-    if (user?.professorId) void refreshCourses(user.professorId)
-  }, [user?.professorId, refreshCourses])
-
-  const myCourses = courseList.filter(c => c.professorId === user?.professorId)
-
-  return (
-    <Dashboard
-      courses={myCourses}
-      grades={grades}
-      onSelectCourse={c => { setSelectedCourseId(c.id); navigate('/grades') }}
-      onLogout={logout}
-    />
-  )
-}
-
-function ProfessorGrades() {
-  const navigate = useNavigate()
-  const { user, logout } = useAuth()
-  const { courseList, grades, lastSaved, selectedCourseId, setSelectedCourseId, updateGrade, updateComponents, updateCuts, refreshCourses } = useGrades()
-
-  // Track whether the initial course-load has completed so we never bounce
-  // back to /dashboard before courses arrive from the API.
-  const [coursesReady, setCoursesReady] = useState(() => courseList.length > 0)
-
-  useEffect(() => {
-    if (user?.professorId) {
-      void refreshCourses(user.professorId).then(() => setCoursesReady(true))
-    } else {
-      setCoursesReady(true)
-    }
-  }, [user?.professorId, refreshCourses])
-
-  const myCourses = courseList.filter(c => c.professorId === user?.professorId)
-  const activeCourse = myCourses.find(c => c.id === selectedCourseId) ?? myCourses[0] ?? null
-
-  // Show a spinner while we wait for the initial fetch to complete
-  if (!coursesReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--canvas-warm)' }}>
-        <div
-          className="w-10 h-10 rounded-full border-4 animate-spin"
-          style={{ borderColor: 'var(--green-light)', borderTopColor: 'var(--green-accent)' }}
-        />
-      </div>
-    )
-  }
-
-  if (!activeCourse) return <Navigate to="/dashboard" replace />
-
-  return (
-    <GradesPage
-      course={activeCourse}
-      grades={grades}
-      lastSaved={lastSaved}
-      onUpdateGrade={updateGrade}
-      onUpdateComponents={(id, comps) => {
-        updateComponents(id, comps)
-        setSelectedCourseId(id)
-      }}
-      onUpdateCuts={(id, cuts) => {
-        updateCuts(id, cuts)
-        setSelectedCourseId(id)
-      }}
-      onBack={() => { setSelectedCourseId(null); navigate('/dashboard') }}
-      onLogout={logout}
-    />
-  )
-}
-
 // ─── Root ────────────────────────────────────────────────────────────────────
 export default function App() {
   const { user } = useAuth()
@@ -172,12 +94,12 @@ export default function App() {
               element={user ? <RoleHome /> : <LoginPage />}
             />
 
-            {/* Admin — explicit path so it never conflicts with professor wildcard */}
+            {/* Admin */}
             <Route path="/admin" element={
               <RequireRole role="admin"><AdminPage /></RequireRole>
             } />
 
-            {/* Student — Mi Progreso is the home */}
+            {/* Student */}
             <Route path="/" element={
               <RequireRole role="student"><MisMaterias /></RequireRole>
             } />
@@ -191,16 +113,16 @@ export default function App() {
 
             {/* Professor */}
             <Route path="/dashboard" element={
-              <RequireRole role="professor"><ProfessorDashboard /></RequireRole>
+              <RequireRole role="professor"><Dashboard /></RequireRole>
             } />
-            <Route path="/grades" element={
-              <RequireRole role="professor"><ProfessorGrades /></RequireRole>
+            <Route path="/grades/:courseId" element={
+              <RequireRole role="professor"><GradesPage /></RequireRole>
             } />
-            <Route path="/estadisticas" element={
-              <RequireRole role="professor"><EstadisticasProfesor /></RequireRole>
-            } />
+            {/* Legacy redirects */}
+            <Route path="/grades"       element={<Navigate to="/dashboard" replace />} />
+            <Route path="/estadisticas" element={<Navigate to="/dashboard" replace />} />
 
-            {/* Catch-all → redirect by role */}
+            {/* Catch-all */}
             <Route path="*" element={<RoleHome />} />
           </Routes>
         </motion.div>
