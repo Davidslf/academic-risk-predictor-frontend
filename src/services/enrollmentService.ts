@@ -24,6 +24,17 @@ export interface BackendEnrollment {
   uso_tutorias:    boolean | null
 }
 
+export interface BackendGradesRead {
+  id:                  string
+  student_id:          string
+  course_id:           string
+  grades:              Record<string, unknown> | null
+  first_cohort_grade:  number | null
+  second_cohort_grade: number | null
+  third_cohort_grade:  number | null
+  final_grade:         number | null
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const enrollmentService = {
@@ -46,5 +57,13 @@ export const enrollmentService = {
    */
   async getById(enrollmentId: string): Promise<BackendEnrollment> {
     return api.get<BackendEnrollment>(`/enrollments/${enrollmentId}`)
+  },
+
+  /**
+   * Get grades for a specific enrollment.
+   * STUDENT can only access their own; PROFESSOR/ADMIN can access any.
+   */
+  async getGrades(enrollmentId: string): Promise<BackendGradesRead> {
+    return api.get<BackendGradesRead>(`/enrollments/${enrollmentId}/grades`)
   },
 }
