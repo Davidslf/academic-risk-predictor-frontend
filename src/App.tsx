@@ -8,6 +8,7 @@ import MisMaterias from './pages/MisMaterias'
 import MateriaDetalle from './pages/MateriaDetalle'
 import Dashboard from './pages/Dashboard'
 import GradesPage from './pages/Grades'
+import ReferralsPage from './pages/Referrals'
 import AdminPage from './pages/Admin'
 
 // ─── Error Boundary ──────────────────────────────────────────────────────────
@@ -117,6 +118,9 @@ export default function App() {
             } />
             <Route path="/grades/:courseId" element={
               <RequireRole role="professor"><GradesPage /></RequireRole>
+            } />
+            <Route path="/referrals/:courseId" element={
+              <RequireRole role="professor"><ReferralsPage /></RequireRole>
             } />
             {/* Legacy redirects */}
             <Route path="/grades"       element={<Navigate to="/dashboard" replace />} />

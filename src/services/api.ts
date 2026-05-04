@@ -152,6 +152,9 @@ export const api = {
   post:   <T>(path: string, body: unknown, opts?: RequestOptions) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body), ...opts }),
 
+  put:    <T>(path: string, body: unknown, opts?: RequestOptions) =>
+    request<T>(path, { method: 'PUT', body: JSON.stringify(body), ...opts }),
+
   patch:  <T>(path: string, body: unknown, opts?: RequestOptions) =>
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body), ...opts }),
 
