@@ -57,9 +57,29 @@ export default function MateriaDetalle() {
     try {
       const enrollments = await enrollmentService.listByStudent(user.studentId)
       const enrollment  = enrollments.find(e => e.course_id === courseId)
-      if (!enrollment) return
-      const grades = await enrollmentService.getGrades(enrollment.id)
-      setGradesData(grades)
+      if (!enrollment || enrollment.nota_parcial_1 == null) return
+
+      // Build GradesRead shape from the flat fields already on the enrollment.
+      // Corte 1 = nota_parcial_1 + seguimiento; Cortes 2 & 3 not yet recorded.
+      setGradesData({
+        id:         enrollment.id,
+        student_id: enrollment.student_id,
+        course_id:  enrollment.course_id,
+        grades: {
+          first_cohort: {
+            parcial:      { note: Number(enrollment.nota_parcial_1), weight: '70%' },
+            seguimiento:  { seguimiento_clase: { note: Number(enrollment.seguimiento), weight: '30%' } },
+          },
+        },
+        first_cohort_grade:  enrollment.nota_parcial_1,
+        second_cohort_grade: null,
+        third_cohort_grade:  null,
+        final_grade:         null,
+        // Extra indicators stored for the details panel
+        _asistencia:  enrollment.asistencia,
+        _logins:      enrollment.logins,
+        _uso_tutorias: enrollment.uso_tutorias,
+      } as BackendGradesRead & { _asistencia: number|null; _logins: number|null; _uso_tutorias: boolean|null })
     } catch {
       // Silently fail — placeholder is shown instead
     } finally {
@@ -353,6 +373,32 @@ export default function MateriaDetalle() {
                       </motion.div>
                     )}
                   </AnimatePresence>
+
+                  {/* Indicadores de seguimiento */}
+                  {(() => {
+                    const g = gradesData as BackendGradesRead & { _asistencia?: number|null; _logins?: number|null; _uso_tutorias?: boolean|null }
+                    const indicators = [
+                      { label: 'Asistencia',   value: g._asistencia   != null ? `${Number(g._asistencia).toFixed(1)} %`  : '—', color: 'var(--green-accent)' },
+                      { label: 'Sesiones LMS', value: g._logins       != null ? String(g._logins)                         : '—', color: '#d97706' },
+                      { label: 'Tutorías',     value: g._uso_tutorias != null ? (g._uso_tutorias ? '✅ Sí' : '❌ No')     : '—', color: g._uso_tutorias ? '#16a34a' : 'var(--text-muted)' },
+                    ]
+                    return (
+                      <div className="rounded-xl p-3" style={{ background: 'var(--canvas-warm)', border: '1px solid rgba(0,0,0,0.06)' }}>
+                        <p className="text-[0.58rem] font-extrabold uppercase tracking-wider mb-2.5"
+                           style={{ color: 'var(--text-faint)' }}>Indicadores de seguimiento</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {indicators.map(({ label, value, color }) => (
+                            <div key={label} className="bg-white rounded-lg p-2.5 text-center"
+                                 style={{ border: '1px solid rgba(0,0,0,0.06)' }}>
+                              <p className="text-[0.58rem] font-bold uppercase tracking-wider mb-1"
+                                 style={{ color: 'var(--text-faint)' }}>{label}</p>
+                              <p className="text-sm font-extrabold" style={{ color }}>{value}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   {/* Final grade */}
                   <div
