@@ -1,10 +1,16 @@
 import { motion } from 'framer-motion'
 import { Users, BookOpen, ChevronRight, AlertTriangle } from 'lucide-react'
-import type { Course } from '../types'
 import CircularProgress from './CircularProgress'
 
+interface CourseDisplay {
+  code:        string
+  name:        string
+  group:       string
+  components?: { length?: number }[] | null
+}
+
 interface Props {
-  course: Course
+  course: CourseDisplay
   studentCount: number
   completionPct: number
   atRiskCount: number
@@ -41,7 +47,7 @@ export default function SubjectCard({ course, studentCount, completionPct, atRis
           </div>
           <div className="flex items-center gap-1.5 text-usb-muted text-xs">
             <BookOpen size={13} />
-            <span>{course.components.length} componentes</span>
+            <span>{course.components?.length ?? 0} componentes</span>
           </div>
           {atRiskCount > 0 && (
             <div className="flex items-center gap-1 text-xs font-medium text-risk-high ml-auto">

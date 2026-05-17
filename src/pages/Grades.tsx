@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ChevronLeft, Download, AlertTriangle, CheckCircle2, Upload, FileSpreadsheet, Save, Loader2, Check, X } from 'lucide-react'
-import type { Course, Grade } from '../types'
+import { ChevronLeft, Download, AlertTriangle, CheckCircle2, Upload, FileSpreadsheet, Save, Loader2, Check, X, QrCode, CalendarCheck, Users, ChevronDown, Clock, Sliders, TrendingDown, TrendingUp } from 'lucide-react'
+import type { Course, Grade, GradeComponent, GradeCut } from '../types'
 import { useGradeCalculation } from '../hooks/useGradeCalculation'
+import { calcWeightedTotal, getRisk } from '../utils/gradeCalculator'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../context/AuthContext'
 import { useGrades } from '../context/GradesContext'
-import { enrollmentService } from '../services/enrollmentService'
+import { enrollmentService, type BackendEnrollment } from '../services/enrollmentService'
+import { attendanceService, type SessionHistoryItem } from '../services/attendanceService'
 import { friendlyError } from '../services/errorMessages'
 import Header from '../components/Header'
 import GradeTable from '../components/GradeTable'
@@ -14,17 +17,30 @@ import ComponentsConfig from '../components/ComponentsConfig'
 import ImportModal from '../components/ImportModal'
 
 interface Props {
-  course: Course
-  grades: Grade[]
-  lastSaved: Date | null
-  onUpdateGrade: (studentId: string, componentId: string, value: number | null) => void
-  onUpdateComponents: (courseId: string, components: Course['components']) => void
-  onUpdateCuts: (courseId: string, cuts: Course['cuts']) => void
-  onBack: () => void
-  onLogout: () => void
+  course:            Course
+  grades:            Grade[]
+  lastSaved:         Date | null
+  onUpdateGrade:     (studentId: string, componentId: string, value: number | null) => void
+  onUpdateComponents:(courseId: string, components: GradeComponent[]) => void
+  onUpdateCuts:      (courseId: string, cuts: GradeCut[]) => void
+  onBack:            () => void
+  onLogout?:         () => void
 }
 
-type Tab = 'grades' | 'config' | 'attendance'
+// ── Colores por umbral ────────────────────────────────────────────────────────
+// Notas (0–5): ≥ 3.4 verde | 3.0–3.39 naranja | < 3.0 rojo
+// Asistencia (0–100): ≥ 75 verde | 60–74 naranja | < 60 rojo
+
+type Threshold = 'green' | 'orange' | 'red' | 'none'
+
+function gradeThreshold(value: number | null): Threshold {
+  if (value == null) return 'none'
+  if (value >= 3.4) return 'green'
+  if (value >= 3.0) return 'orange'
+  return 'red'
+}
+
+type Tab = 'grades' | 'config' | 'attendance' | 'qr-history' | 'simulator'
 type CohortKey = 'first_cohort' | 'second_cohort' | 'third_cohort'
 
 const COHORT_KEYS: CohortKey[] = ['first_cohort', 'second_cohort', 'third_cohort']
@@ -104,6 +120,7 @@ export default function GradesPage({
   course, grades, lastSaved,
   onUpdateGrade, onUpdateComponents, onUpdateCuts, onBack,
 }: Props) {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<Tab>('grades')
   const [showImport, setShowImport] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
@@ -115,6 +132,11 @@ export default function GradesPage({
   const [attendanceRows, setAttendanceRows] = useState<Record<string, AttendanceRowState>>({})
   const [attendanceSavingStudentId, setAttendanceSavingStudentId] = useState<string | null>(null)
   const [attendanceLoadedCourseId, setAttendanceLoadedCourseId] = useState<string | null>(null)
+  const [sessionHistory, setSessionHistory] = useState<SessionHistoryItem[]>([])
+  const [sessionHistoryLoading, setSessionHistoryLoading] = useState(false)
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
+  const [simBonus, setSimBonus] = useState(0)
+  const [simStudentId, setSimStudentId] = useState<string>('all')
   const { user } = useAuth()
   const { courseStudentsMap } = useGrades()
   const courseStudentsList = courseStudentsMap[course.id] ?? []
@@ -125,7 +147,7 @@ export default function GradesPage({
     normalizedNames.some(n => n.length === 0)
     || new Set(normalizedNames).size !== normalizedNames.length
   const allValid = totalPct === 100 && cutsTotal === 100 && !hasInvalidNames
-  const { atRiskCount, completionPct, courseStudents } = useGradeCalculation(course, grades, courseStudentsList)
+  const { atRiskCount, completionPct, courseStudents, totals, gradeMap } = useGradeCalculation(course, grades, courseStudentsList)
   const toast = useToast()
   const selectedAttendanceCohort = COHORT_KEYS[Math.min(attendanceCutIndex, COHORT_KEYS.length - 1)]
   const attendanceCutLabel = useMemo(
@@ -133,18 +155,12 @@ export default function GradesPage({
     [course.cuts, attendanceCutIndex],
   )
 
-  const handleImport = (importedGrades: Grade[]) => {
-    let count = 0
-    for (const g of importedGrades) {
-      if (g.value !== null) {
-        onUpdateGrade(g.studentId, g.componentId, g.value)
-        count++
-      }
-    }
-    toast.success(
-      `${count} notas importadas`,
-      `Las calificaciones de ${course.name} fueron actualizadas correctamente.`
-    )
+  const handleImport = (imported: Grade[]) => {
+    imported.forEach(g => {
+      onUpdateGrade(g.studentId, g.componentId, g.value)
+    })
+    setShowImport(false)
+    toast.success('Notas importadas', `${imported.length} nota(s) importadas correctamente.`)
   }
 
   const handleSaveConfig = async () => {
@@ -286,31 +302,40 @@ export default function GradesPage({
     }
   }, [activeTab, attendanceLoadedCourseId, course.id, attendanceLoading, loadAttendance])
 
+  useEffect(() => {
+    if (activeTab === 'qr-history' && sessionHistory.length === 0 && !sessionHistoryLoading) {
+      setSessionHistoryLoading(true)
+      void attendanceService.getCourseSessionHistory(course.id).then(data => {
+        setSessionHistory(data)
+        setSessionHistoryLoading(false)
+      })
+    }
+  }, [activeTab, course.id, sessionHistory.length, sessionHistoryLoading])
+
   return (
-    <div className="min-h-screen bg-usb-canvas flex flex-col">
-      <Header
-        lastSaved={lastSaved}
-        subtitle={`${course.code} · ${course.name}`}
-      />
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--canvas-warm)' }}>
+      <Header />
 
-      {/* Breadcrumb + actions */}
-      <div className="bg-white border-b border-usb-border px-5 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 px-5 pt-5 max-w-7xl mx-auto w-full">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-xs font-bold text-usb-muted hover:text-usb-text transition-colors"
+        >
+          <ChevronLeft size={14} />
+          Volver
+        </button>
+
+        <div className="ml-auto flex items-center gap-2">
           <button
-            onClick={onBack}
-            className="flex items-center gap-1.5 text-usb-muted transition-colors font-medium"
-            style={{ ['--tw-hover-color' as string]: 'var(--green-accent)' }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'var(--green-accent)')}
-            onMouseLeave={e => (e.currentTarget.style.color = '')}
+            onClick={() => navigate(`/materia/${course.id}/asistencia`)}
+            className="flex items-center gap-1.5 text-xs font-bold text-white px-3.5 py-1.5 rounded-full transition-all shadow-sm"
+            style={{ background: 'var(--green-deep)' }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
           >
-            <ChevronLeft size={14} />
-            <span className="text-xs">Mis materias</span>
+            <QrCode size={12} />
+            Asistencia QR
           </button>
-          <span className="text-usb-border">/</span>
-          <span className="text-xs font-bold" style={{ color: 'var(--green-accent)' }}>{course.name}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
           <button
             onClick={() => setShowImport(true)}
             className="flex items-center gap-1.5 text-xs font-bold text-white px-3.5 py-1.5 rounded-full transition-all shadow-sm"
@@ -413,6 +438,8 @@ export default function GradesPage({
             { key: 'grades', label: 'Calificaciones' },
             { key: 'config', label: `Distribución de notas`, warn: !allValid },
             { key: 'attendance', label: 'Asistencia' },
+            { key: 'qr-history', label: 'Historial QR' },
+            { key: 'simulator', label: 'Simulador' },
           ].map(tab => (
             <button
               key={tab.key}
@@ -424,9 +451,6 @@ export default function GradesPage({
               style={activeTab === tab.key ? { background: 'var(--green-accent)' } : {}}
             >
               {tab.label}
-              {tab.warn && (
-                <span className={`w-2 h-2 rounded-full ${activeTab === tab.key ? 'bg-white' : 'bg-amber-400'}`} />
-              )}
             </button>
           ))}
         </div>
@@ -569,6 +593,377 @@ export default function GradesPage({
               <p className="text-xs text-usb-faint">
                 Cohorte activo: <span className="font-bold text-usb-muted">{attendanceCutLabel}</span>.
               </p>
+            </div>
+          )}
+
+          {/* ─── Scenario Simulator ─── */}
+          {activeTab === 'simulator' && (() => {
+            // Compute per-student current vs simulated risk
+            const riskLabel = (r: ReturnType<typeof getRisk>) =>
+              r === 'high' ? 'ALTO' : r === 'medium' ? 'MEDIO' : r === 'low' ? 'BAJO' : '—'
+            const riskColor2 = (r: ReturnType<typeof getRisk>) =>
+              r === 'high' ? '#dc2626' : r === 'medium' ? '#d97706' : '#16a34a'
+            const riskBg2 = (r: ReturnType<typeof getRisk>) =>
+              r === 'high' ? '#fee2e2' : r === 'medium' ? '#fef3c7' : '#dcfce7'
+
+            const allRows = courseStudents.map(s => {
+              const baseGrade = totals[s.id]
+              const simGrade  = baseGrade !== null ? Math.min(5.0, baseGrade + simBonus) : null
+              const baseRisk  = getRisk(baseGrade)
+              const simRisk   = getRisk(simGrade)
+              const improved  = baseRisk !== simRisk && simRisk !== null && (
+                (baseRisk === 'high' && (simRisk === 'medium' || simRisk === 'low')) ||
+                (baseRisk === 'medium' && simRisk === 'low')
+              )
+              return { s, baseGrade, simGrade, baseRisk, simRisk, improved }
+            })
+
+            // Filas filtradas por estudiante seleccionado (para distribución y tabla)
+            const studentRows = simStudentId === 'all'
+              ? allRows
+              : allRows.filter(r => r.s.id === simStudentId)
+
+            const baseCounts = {
+              high:   studentRows.filter(r => r.baseRisk === 'high').length,
+              medium: studentRows.filter(r => r.baseRisk === 'medium').length,
+              low:    studentRows.filter(r => r.baseRisk === 'low').length,
+              none:   studentRows.filter(r => r.baseRisk === null).length,
+            }
+            const simCounts = {
+              high:   studentRows.filter(r => r.simRisk === 'high').length,
+              medium: studentRows.filter(r => r.simRisk === 'medium').length,
+              low:    studentRows.filter(r => r.simRisk === 'low').length,
+              none:   studentRows.filter(r => r.simRisk === null).length,
+            }
+            const improvedCount = studentRows.filter(r => r.improved).length
+            const total = studentRows.length
+
+            return (
+              <div className="p-5 space-y-5">
+                {/* Header */}
+                <div>
+                  <p className="text-sm font-bold text-usb-text">Simulador de escenarios</p>
+                  <p className="text-xs text-usb-muted">
+                    Aplica una bonificación hipotética y visualiza cómo cambia la distribución de riesgo del grupo.
+                  </p>
+                </div>
+
+                {/* Student selector */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label className="text-xs font-bold uppercase tracking-wider text-usb-muted flex-shrink-0">
+                    Estudiante:
+                  </label>
+                  <select
+                    value={simStudentId}
+                    onChange={e => { setSimStudentId(e.target.value) }}
+                    className="text-sm font-semibold rounded-xl px-3 py-1.5 border border-usb-border bg-white text-usb-text outline-none cursor-pointer"
+                    style={{ minWidth: '200px' }}
+                  >
+                    <option value="all">Todos los estudiantes ({courseStudents.length})</option>
+                    {courseStudents.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                  {simStudentId !== 'all' && (
+                    <button
+                      onClick={() => setSimStudentId('all')}
+                      className="text-xs text-usb-muted hover:text-usb-text underline underline-offset-2"
+                    >
+                      Ver todos
+                    </button>
+                  )}
+                </div>
+
+                {/* Bonus slider */}
+                <div
+                  className="rounded-2xl p-4 space-y-3"
+                  style={{ background: 'var(--canvas-warm)', border: '1px solid rgba(0,0,0,0.07)' }}
+                >
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                         style={{ background: 'rgba(0,117,74,0.10)', color: 'var(--green-accent)' }}>
+                      <Sliders size={15} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-sm text-usb-text">Bonificación aplicada</p>
+                      <p className="text-xs text-usb-muted">Puntos extra sumados a la nota final de cada estudiante</p>
+                    </div>
+                    <span
+                      className="text-2xl font-extrabold w-16 text-right"
+                      style={{ color: simBonus > 0 ? 'var(--green-accent)' : 'var(--text-faint)' }}
+                    >
+                      +{simBonus.toFixed(1)}
+                    </span>
+                  </div>
+                  <input
+                    type="range" min={0} max={2} step={0.1}
+                    value={simBonus}
+                    onChange={e => setSimBonus(Number(e.target.value))}
+                    className="w-full accent-green-600"
+                  />
+                  <div className="flex justify-between text-xs text-usb-faint font-semibold">
+                    <span>0.0 (sin cambio)</span>
+                    <span>+1.0</span>
+                    <span>+2.0 (máx)</span>
+                  </div>
+                </div>
+
+                {/* Distribution comparison */}
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {/* Before */}
+                  <div className="rounded-xl p-4 space-y-2.5"
+                       style={{ background: 'white', border: '1px solid rgba(0,0,0,0.07)' }}>
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-usb-muted">Situación actual</p>
+                    {([
+                      { label: 'ALTO riesgo',  count: baseCounts.high,   color: '#dc2626', bg: '#fee2e2' },
+                      { label: 'MEDIO riesgo', count: baseCounts.medium, color: '#d97706', bg: '#fef3c7' },
+                      { label: 'BAJO riesgo',  count: baseCounts.low,    color: '#16a34a', bg: '#dcfce7' },
+                      { label: 'Sin evaluar',  count: baseCounts.none,   color: '#9ca3af', bg: '#f3f4f6' },
+                    ] as const).filter(x => x.count > 0).map(({ label, count, color, bg }) => (
+                      <div key={label} className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-xs font-semibold" style={{ color }}>{label}</span>
+                            <span className="text-xs font-bold" style={{ color }}>{count} / {total}</span>
+                          </div>
+                          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
+                            <div className="h-full rounded-full" style={{ width: `${total > 0 ? (count/total)*100 : 0}%`, background: color }} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* After */}
+                  <div className="rounded-xl p-4 space-y-2.5"
+                       style={{ background: simBonus > 0 ? 'rgba(0,117,74,0.03)' : 'white', border: `1px solid ${simBonus > 0 ? 'rgba(0,117,74,0.15)' : 'rgba(0,0,0,0.07)'}` }}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-extrabold uppercase tracking-wider text-usb-muted">Con bonificación +{simBonus.toFixed(1)}</p>
+                      {improvedCount > 0 && (
+                        <span className="flex items-center gap-1 text-xs font-bold text-emerald-600">
+                          <TrendingUp size={11} /> {improvedCount} mejoran
+                        </span>
+                      )}
+                    </div>
+                    {([
+                      { label: 'ALTO riesgo',  count: simCounts.high,   baseCount: baseCounts.high,   color: '#dc2626', bg: '#fee2e2' },
+                      { label: 'MEDIO riesgo', count: simCounts.medium, baseCount: baseCounts.medium, color: '#d97706', bg: '#fef3c7' },
+                      { label: 'BAJO riesgo',  count: simCounts.low,    baseCount: baseCounts.low,    color: '#16a34a', bg: '#dcfce7' },
+                      { label: 'Sin evaluar',  count: simCounts.none,   baseCount: baseCounts.none,   color: '#9ca3af', bg: '#f3f4f6' },
+                    ] as const).filter(x => x.count > 0 || x.baseCount > 0).map(({ label, count, baseCount, color, bg }) => {
+                      const delta = count - baseCount
+                      return (
+                        <div key={label} className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-xs font-semibold" style={{ color }}>{label}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold" style={{ color }}>{count} / {total}</span>
+                                {delta !== 0 && (
+                                  <span className="text-[0.60rem] font-bold"
+                                        style={{ color: delta < 0 && color === '#dc2626' ? '#16a34a' : delta > 0 && color === '#16a34a' ? '#16a34a' : '#d97706' }}>
+                                    {delta > 0 ? `+${delta}` : delta}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#f3f4f6' }}>
+                              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${total > 0 ? (count/total)*100 : 0}%`, background: color }} />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Per-student table */}
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-usb-muted mb-2">Detalle por estudiante</p>
+                  <div className="overflow-x-auto border border-usb-border rounded-xl">
+                    <table className="min-w-full">
+                      <thead className="bg-usb-canvas border-b border-usb-border">
+                        <tr className="text-left">
+                          <th className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-usb-muted">Estudiante</th>
+                          <th className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-usb-muted">Nota actual</th>
+                          <th className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-usb-muted">Riesgo actual</th>
+                          <th className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-usb-muted">Nota +bono</th>
+                          <th className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-usb-muted">Riesgo +bono</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {studentRows.map(({ s, baseGrade, simGrade, baseRisk, simRisk, improved }) => (
+                          <tr key={s.id} className={`border-t border-usb-border ${improved ? 'bg-emerald-50/50' : ''}`}>
+                            <td className="px-4 py-2.5 text-sm font-semibold text-usb-text">{s.name}</td>
+                            <td className="px-4 py-2.5 text-sm font-bold"
+                                style={{ color: baseGrade !== null ? (baseGrade >= 3.0 ? '#16a34a' : '#dc2626') : 'var(--text-faint)' }}>
+                              {baseGrade !== null ? baseGrade.toFixed(2) : '—'}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              {baseRisk && (
+                                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                                      style={{ background: riskBg2(baseRisk), color: riskColor2(baseRisk) }}>
+                                  {riskLabel(baseRisk)}
+                                </span>
+                              )}
+                              {!baseRisk && <span className="text-xs text-usb-faint">—</span>}
+                            </td>
+                            <td className="px-4 py-2.5 text-sm font-bold"
+                                style={{ color: simGrade !== null ? (simGrade >= 3.0 ? '#16a34a' : '#dc2626') : 'var(--text-faint)' }}>
+                              {simGrade !== null ? simGrade.toFixed(2) : '—'}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center gap-1.5">
+                                {simRisk && (
+                                  <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                                        style={{ background: riskBg2(simRisk), color: riskColor2(simRisk) }}>
+                                    {riskLabel(simRisk)}
+                                  </span>
+                                )}
+                                {improved && (
+                                  <TrendingUp size={12} className="text-emerald-600 flex-shrink-0" />
+                                )}
+                                {!simRisk && <span className="text-xs text-usb-faint">—</span>}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ─── QR Session History ─── */}
+          {activeTab === 'qr-history' && (
+            <div className="p-5 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-usb-text">Sesiones de asistencia QR</p>
+                  <p className="text-xs text-usb-muted">Historial de todas las sesiones QR abiertas para este curso.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSessionHistory([])
+                    setSessionHistoryLoading(true)
+                    void attendanceService.getCourseSessionHistory(course.id).then(data => {
+                      setSessionHistory(data)
+                      setSessionHistoryLoading(false)
+                    })
+                  }}
+                  className="text-xs font-bold px-3 py-1.5 rounded-xl border border-usb-border hover:bg-usb-canvas transition-colors"
+                  style={{ color: 'var(--green-accent)' }}
+                >
+                  Actualizar
+                </button>
+              </div>
+
+              {sessionHistoryLoading ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 size={22} className="animate-spin" style={{ color: 'var(--green-accent)' }} />
+                </div>
+              ) : sessionHistory.length === 0 ? (
+                <div className="flex flex-col items-center py-12 gap-2 rounded-xl"
+                     style={{ background: 'var(--canvas-warm)', border: '1.5px dashed rgba(0,0,0,0.10)' }}>
+                  <QrCode size={28} style={{ color: 'var(--text-faint)' }} />
+                  <p className="font-semibold text-sm text-usb-muted">Sin sesiones QR aún</p>
+                  <p className="text-xs text-usb-faint">Las sesiones de asistencia con QR aparecerán aquí.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {sessionHistory.map(session => {
+                    const isExpanded = expandedSessionId === session.id
+                    const startDate = new Date(session.created_at).toLocaleString('es-CO', {
+                      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                      timeZone: 'America/Bogota',
+                    })
+                    return (
+                      <div key={session.id}
+                           className="rounded-xl overflow-hidden"
+                           style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
+                        {/* Session header row */}
+                        <button
+                          onClick={() => setExpandedSessionId(isExpanded ? null : session.id)}
+                          className="w-full flex items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50"
+                          style={{ background: 'var(--canvas-warm)' }}
+                        >
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                               style={{ background: session.is_active ? 'rgba(0,117,74,0.10)' : 'rgba(0,0,0,0.05)' }}>
+                            <CalendarCheck size={15} style={{ color: session.is_active ? 'var(--green-accent)' : 'var(--text-faint)' }} />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <p className="font-bold text-sm text-usb-text">
+                              {session.label ?? 'Sesión sin nombre'}
+                            </p>
+                            <div className="flex items-center gap-3 mt-0.5">
+                              <span className="flex items-center gap-1 text-xs text-usb-muted">
+                                <Clock size={10} /> {startDate}
+                              </span>
+                              <span className="flex items-center gap-1 text-xs font-semibold"
+                                    style={{ color: 'var(--green-accent)' }}>
+                                <Users size={10} /> {session.total_attendees} asistentes
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {session.is_active ? (
+                              <span className="text-[0.62rem] font-bold px-2 py-0.5 rounded-full text-emerald-700"
+                                    style={{ background: '#dcfce7' }}>● Activa</span>
+                            ) : (
+                              <span className="text-[0.62rem] font-bold px-2 py-0.5 rounded-full text-gray-500"
+                                    style={{ background: '#f3f4f6' }}>Cerrada</span>
+                            )}
+                            <ChevronDown
+                              size={14}
+                              className="text-usb-muted transition-transform duration-200"
+                              style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                            />
+                          </div>
+                        </button>
+
+                        {/* Attendees list */}
+                        {isExpanded && (
+                          <div className="border-t border-usb-border">
+                            {session.attendees.length === 0 ? (
+                              <p className="text-xs text-usb-faint text-center py-4">Sin registros de asistencia aún.</p>
+                            ) : (
+                              <table className="min-w-full">
+                                <thead className="bg-usb-canvas">
+                                  <tr>
+                                    <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wider text-usb-muted">Estudiante</th>
+                                    <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wider text-usb-muted">Hora registrada</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {session.attendees.map((att, i) => {
+                                    const t = new Date(att.recorded_at).toLocaleTimeString('es-CO', {
+                                      hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota',
+                                    })
+                                    return (
+                                      <tr key={`${att.student_id}-${i}`}
+                                          className="border-t border-usb-border last:border-b-0">
+                                        <td className="px-4 py-2.5 text-sm font-semibold text-usb-text">{att.student_name}</td>
+                                        <td className="px-4 py-2.5 text-sm text-usb-muted flex items-center gap-1.5">
+                                          <CheckCircle2 size={13} className="text-emerald-500 flex-shrink-0" />
+                                          {t}
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
         </motion.div>

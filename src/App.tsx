@@ -2,17 +2,22 @@ import { useState, useEffect, useCallback, Component, type ReactNode } from 'rea
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from './context/AuthContext'
-import { useGrades } from './context/GradesContext'
 import LoginPage from './pages/Login'
 import Prediccion from './pages/Prediccion'
 import MisMaterias from './pages/MisMaterias'
 import MateriaDetalle from './pages/MateriaDetalle'
 import Dashboard from './pages/Dashboard'
 import GradesPage from './pages/Grades'
+import ReferralsPage from './pages/Referrals'
 import AdminPage from './pages/Admin'
 import EstadisticasProfesor from './pages/EstadisticasProfesor'
+import Simulador from './pages/Simulador'
+import AsistenciaProfesor from './pages/AsistenciaProfesor'
+import AsistenciaEstudiante from './pages/AsistenciaEstudiante'
+import PerfilPage from './pages/Perfil'
 import ConsentModal from './components/ConsentModal'
 import { consentService } from './services/consentService'
+import { useGrades } from './context/GradesContext'
 
 // ─── Error Boundary ──────────────────────────────────────────────────────────
 interface EBState { hasError: boolean; message: string }
@@ -77,24 +82,7 @@ function RoleHome() {
 
 // ─── Professor page components ───────────────────────────────────────────────
 function ProfessorDashboard() {
-  const navigate = useNavigate()
-  const { user, logout } = useAuth()
-  const { courseList, grades, refreshCourses, setSelectedCourseId } = useGrades()
-
-  useEffect(() => {
-    if (user?.professorId) void refreshCourses(user.professorId)
-  }, [user?.professorId, refreshCourses])
-
-  const myCourses = courseList.filter(c => c.professorId === user?.professorId)
-
-  return (
-    <Dashboard
-      courses={myCourses}
-      grades={grades}
-      onSelectCourse={c => { setSelectedCourseId(c.id); navigate('/grades') }}
-      onLogout={logout}
-    />
-  )
+  return <Dashboard />
 }
 
 function ProfessorGrades() {
@@ -199,7 +187,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <StudentConsentGate />
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="sync" initial={false}>
         <motion.div
           key={location.pathname}
           initial={{ opacity: 0, y: 10 }}
@@ -215,12 +203,12 @@ export default function App() {
               element={user ? <RoleHome /> : <LoginPage />}
             />
 
-            {/* Admin — explicit path so it never conflicts with professor wildcard */}
+            {/* Admin */}
             <Route path="/admin" element={
               <RequireRole role="admin"><AdminPage /></RequireRole>
             } />
 
-            {/* Student — Mi Progreso is the home */}
+            {/* Student */}
             <Route path="/" element={
               <RequireRole role="student"><MisMaterias /></RequireRole>
             } />
@@ -231,19 +219,32 @@ export default function App() {
             <Route path="/materia/:courseId" element={
               <RequireRole role="student"><MateriaDetalle /></RequireRole>
             } />
+            <Route path="/materia/:courseId/simulador" element={
+              <RequireRole role="student"><Simulador /></RequireRole>
+            } />
 
             {/* Professor */}
             <Route path="/dashboard" element={
-              <RequireRole role="professor"><ProfessorDashboard /></RequireRole>
+              <RequireRole role="professor"><Dashboard /></RequireRole>
             } />
-            <Route path="/grades" element={
+            <Route path="/grades/:courseId" element={
               <RequireRole role="professor"><ProfessorGrades /></RequireRole>
             } />
-            <Route path="/estadisticas" element={
-              <RequireRole role="professor"><EstadisticasProfesor /></RequireRole>
+            <Route path="/referrals/:courseId" element={
+              <RequireRole role="professor"><ReferralsPage /></RequireRole>
             } />
+            {/* Legacy redirects */}
+            <Route path="/grades"       element={<Navigate to="/dashboard" replace />} />
+            {/* Asistencias con QR */}
+            <Route path="/materia/:courseId/asistencia" element={
+              <RequireRole role="professor"><AsistenciaProfesor /></RequireRole>
+            } />
+            <Route path="/asistencia/:sessionId/:token" element={<AsistenciaEstudiante />} />
+            <Route path="/asistencia" element={<AsistenciaEstudiante />} />
+            <Route path="/estadisticas" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/perfil" element={<PerfilPage />} />
 
-            {/* Catch-all → redirect by role */}
+            {/* Catch-all */}
             <Route path="*" element={<RoleHome />} />
           </Routes>
         </motion.div>

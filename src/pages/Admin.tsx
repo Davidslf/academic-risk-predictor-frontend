@@ -11,7 +11,7 @@ import {
   Plus, X, LogOut, ShieldCheck, GraduationCap,
   Loader2, ChevronDown, ChevronUp, AlertCircle, Search,
   Pencil, Eye, Clock, History, CheckCircle2, XCircle,
-  ArrowLeft, Upload,
+  ArrowLeft, Upload, Mail, MessageSquare, Filter,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -28,6 +28,8 @@ import { userService } from '../services/userService'
 import type { UserRole, AuditLogEntry, UserUpdatePayload } from '../services/userService'
 import type { BackendUser } from '../services/authService'
 import { notificationService } from '../services/notificationService'
+import { templateService } from '../services/templateService'
+import type { Template } from '../services/templateService'
 import { friendlyError } from '../services/errorMessages'
 import { useToast } from '../components/Toast'
 import { useAuth } from '../context/AuthContext'
@@ -35,7 +37,7 @@ import { useAuth } from '../context/AuthContext'
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
 // 'universidades' tab is hidden for now — code preserved for future feature
-type Tab = 'universidades' | 'programas' | 'usuarios'
+type Tab = 'universidades' | 'programas' | 'usuarios' | 'templates'
 
 const DEGREE_TYPES = ['PREG', 'POST', 'TEC'] as const
 type DegreeType = typeof DEGREE_TYPES[number]
@@ -3012,12 +3014,396 @@ function SubjectCoursesView({
   )
 }
 
+// ─── WhatsApp markdown renderer ───────────────────────────────────────────────
+// Convierte el formato de WhatsApp (*bold*, _italic_, ~strike~, ```mono```)
+// a HTML para mostrar previews reales en el admin.
+
+function renderWhatsAppText(raw: string): string {
+  return raw
+    // Escapar caracteres HTML primero
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    // Negrilla: *texto*
+    .replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>')
+    // Cursiva: _texto_
+    .replace(/_([^_\n]+)_/g, '<em>$1</em>')
+    // Tachado: ~texto~
+    .replace(/~([^~\n]+)~/g, '<s>$1</s>')
+    // Monoespaciado: `texto`
+    .replace(/`([^`\n]+)`/g, '<code style="font-family:monospace;font-size:0.85em;background:rgba(255,255,255,0.15);padding:1px 3px;border-radius:3px">$1</code>')
+    // Saltos de línea
+    .replace(/\n/g, '<br/>')
+}
+
+function WhatsAppBubble({
+  text,
+  truncate = false,
+}: {
+  text: string
+  truncate?: boolean
+}) {
+  // Para truncar, limitamos la cantidad de HTML generado cortando el texto raw
+  const raw = truncate && text.length > 160 ? text.slice(0, 160) + '…' : text
+  const html = renderWhatsAppText(raw)
+
+  return (
+    <div
+      className="relative rounded-2xl rounded-tl-none px-4 py-3 text-sm leading-relaxed text-white"
+      style={{ background: '#005c4b', fontFamily: '"Segoe UI", system-ui, sans-serif' }}
+    >
+      {/* tail */}
+      <span
+        className="absolute -left-[7px] top-0 w-0 h-0"
+        style={{
+          borderTop: '9px solid #005c4b',
+          borderLeft: '8px solid transparent',
+        }}
+      />
+      <span
+        dangerouslySetInnerHTML={{ __html: html }}
+        className={truncate ? 'line-clamp-5 block' : 'block'}
+        style={{ whiteSpace: 'pre-wrap' } as React.CSSProperties}
+      />
+      <span
+        className="block text-right text-[0.6rem] mt-1.5"
+        style={{ color: 'rgba(255,255,255,0.45)' }}
+      >
+        Vista previa ✓✓
+      </span>
+    </div>
+  )
+}
+
+// ─── TemplatesTab ─────────────────────────────────────────────────────────────
+
+type TemplateTypeFilter = 'all' | 'email' | 'whatsapp'
+
+const CATEGORY_LABELS: Record<string, string> = {
+  estudiante: 'Estudiante',
+  profesor:   'Profesor',
+  consejeria: 'Consejería',
+  chatbot:    'Chatbot',
+}
+
+function TemplateSkeleton() {
+  return (
+    <div className="bg-white rounded-2xl border border-usb-border overflow-hidden animate-pulse">
+      <div className="h-12 bg-usb-canvas" />
+      <div className="p-4 space-y-3">
+        <div className="h-4 bg-usb-canvas rounded-full w-1/3" />
+        <div className="h-5 bg-usb-canvas rounded-full w-2/3" />
+        <div className="h-4 bg-usb-canvas rounded-full w-1/2" />
+        <div className="h-8 bg-usb-canvas rounded-full mt-4" />
+      </div>
+    </div>
+  )
+}
+
+function TemplatePreviewModal({
+  template,
+  onClose,
+}: {
+  template: Template
+  onClose: () => void
+}) {
+  const isEmail = template.type === 'email'
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 20, scale: 0.96 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+        onClick={e => e.stopPropagation()}
+        className="bg-white rounded-3xl shadow-modal w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+      >
+        {/* Header */}
+        <div
+          className="px-5 py-3 flex items-center justify-between gap-3 flex-shrink-0"
+          style={{ background: 'var(--green-deep)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center flex-shrink-0">
+              {isEmail
+                ? <Mail size={15} className="text-white/80" />
+                : <MessageSquare size={15} className="text-white/80" />}
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-white font-bold text-sm leading-tight truncate">{template.name}</h2>
+              <p className="text-white/45 text-[0.62rem] mt-0.5">
+                {isEmail ? 'Vista previa de email' : 'Vista previa de WhatsApp'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl flex items-center justify-center bg-white text-gray-600 hover:bg-red-50 hover:text-red-500 transition-all flex-shrink-0"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto">
+          {isEmail ? (
+            <iframe
+              srcDoc={template.preview_html}
+              className="w-full border-0"
+              style={{ minHeight: '480px' }}
+              title={template.name}
+              sandbox="allow-same-origin"
+            />
+          ) : (
+            <div className="p-6 min-h-[300px]" style={{ background: '#111b21' }}>
+              <div className="flex justify-start pl-3 max-w-sm">
+                <WhatsAppBubble text={template.preview_text} />
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function EmailTemplateCard({
+  template,
+  onPreview,
+}: {
+  template:  Template
+  onPreview: (t: Template) => void
+}) {
+  const categoryLabel = CATEGORY_LABELS[template.category] ?? template.category
+
+  return (
+    <div className="bg-white rounded-2xl border border-usb-border overflow-hidden flex flex-col hover:border-green-accent/40 hover:shadow-md transition-all">
+      {/* Card header */}
+      <div className="px-4 py-3 border-b border-usb-border bg-usb-canvas flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-green-accent/10 border border-green-accent/20 flex items-center justify-center flex-shrink-0">
+            <Mail size={14} className="text-green-accent" />
+          </div>
+          <span
+            className="text-[0.62rem] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
+            style={{ background: 'rgba(0,117,74,0.12)', color: '#00754A' }}
+          >
+            EMAIL
+          </span>
+        </div>
+        <span
+          className="text-[0.62rem] font-bold px-2 py-0.5 rounded-full border"
+          style={{ borderColor: 'rgba(0,117,74,0.25)', color: '#00754A', background: 'rgba(0,117,74,0.06)' }}
+        >
+          {categoryLabel}
+        </span>
+      </div>
+
+      {/* Card body */}
+      <div className="p-4 flex flex-col flex-1 gap-1.5">
+        <h3 className="font-bold text-usb-text text-sm leading-tight">{template.name}</h3>
+        {template.subject && (
+          <p className="text-xs text-usb-muted italic leading-snug line-clamp-2">
+            {template.subject}
+          </p>
+        )}
+      </div>
+
+      {/* Card footer */}
+      <div className="px-4 pb-4">
+        <button
+          onClick={() => onPreview(template)}
+          className="w-full flex items-center justify-center gap-2 py-2 rounded-full border border-green-accent/40 text-green-accent text-xs font-bold hover:bg-green-accent hover:text-white transition-all"
+        >
+          <Eye size={13} />
+          Ver preview
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function WhatsAppTemplateCard({
+  template,
+  onPreview,
+}: {
+  template:  Template
+  onPreview: (t: Template) => void
+}) {
+  const categoryLabel = CATEGORY_LABELS[template.category] ?? template.category
+
+  return (
+    <div className="bg-white rounded-2xl border border-usb-border overflow-hidden flex flex-col hover:border-green-accent/40 hover:shadow-md transition-all">
+      {/* Card header */}
+      <div className="px-4 py-3 border-b border-usb-border bg-usb-canvas flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-green-accent/10 border border-green-accent/20 flex items-center justify-center flex-shrink-0">
+            <MessageSquare size={14} className="text-green-accent" />
+          </div>
+          <span
+            className="text-[0.62rem] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
+            style={{ background: 'rgba(0,117,74,0.12)', color: '#00754A' }}
+          >
+            WHATSAPP
+          </span>
+        </div>
+        <span
+          className="text-[0.62rem] font-bold px-2 py-0.5 rounded-full border"
+          style={{ borderColor: 'rgba(0,117,74,0.25)', color: '#00754A', background: 'rgba(0,117,74,0.06)' }}
+        >
+          {categoryLabel}
+        </span>
+      </div>
+
+      {/* Card body */}
+      <div className="p-4 flex flex-col flex-1 gap-2">
+        <h3 className="font-bold text-usb-text text-sm leading-tight">{template.name}</h3>
+        {/* WhatsApp bubble preview con negrillas reales */}
+        <div className="mt-1 pl-2">
+          <WhatsAppBubble text={template.preview_text} truncate />
+        </div>
+      </div>
+
+      {/* Card footer */}
+      <div className="px-4 pb-4">
+        <button
+          onClick={() => onPreview(template)}
+          className="w-full flex items-center justify-center gap-2 py-2 rounded-full border border-green-accent/40 text-green-accent text-xs font-bold hover:bg-green-accent hover:text-white transition-all"
+        >
+          <Eye size={13} />
+          Ver completo
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function TemplatesTab() {
+  const [templates, setTemplates]     = useState<Template[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState('')
+  const [typeFilter, setTypeFilter]   = useState<TemplateTypeFilter>('all')
+  const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    templateService.getAll()
+      .then(data => { if (!cancelled) setTemplates(data) })
+      .catch(err  => { if (!cancelled) setError(friendlyError(err)) })
+      .finally(()  => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const filtered = useMemo(() => {
+    if (typeFilter === 'all') return templates
+    return templates.filter(t => t.type === typeFilter)
+  }, [templates, typeFilter])
+
+  const filterButtons: { key: TemplateTypeFilter; label: string }[] = [
+    { key: 'all',       label: 'Todos' },
+    { key: 'email',     label: 'Email' },
+    { key: 'whatsapp',  label: 'WhatsApp' },
+  ]
+
+  return (
+    <div className="space-y-6">
+      {/* Section header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-xl font-extrabold text-usb-text tracking-tight">Templates</h2>
+          <p className="text-usb-muted text-sm mt-0.5">
+            Plantillas de comunicación por email y WhatsApp.
+          </p>
+        </div>
+        {!loading && !error && (
+          <span className="text-xs font-bold text-usb-muted">
+            {filtered.length} plantilla{filtered.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+
+      {/* Filter bar */}
+      <div className="flex items-center gap-2">
+        <Filter size={14} className="text-usb-faint flex-shrink-0" />
+        <div className="flex gap-1.5">
+          {filterButtons.map(btn => (
+            <button
+              key={btn.key}
+              onClick={() => setTypeFilter(btn.key)}
+              className="px-4 py-1.5 rounded-full text-xs font-bold border transition-all"
+              style={
+                typeFilter === btn.key
+                  ? { background: '#00754A', color: '#fff', borderColor: '#00754A' }
+                  : { background: '#fff', color: '#6b7280', borderColor: '#e5e7eb' }
+              }
+            >
+              {btn.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      {error && <ErrorBanner message={error} />}
+
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <TemplateSkeleton key={i} />)}
+        </div>
+      ) : filtered.length === 0 && !error ? (
+        <EmptyState icon={Mail} message="No hay plantillas disponibles." />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {filtered.map((t, i) => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.04 }}
+            >
+              {t.type === 'email'
+                ? <EmailTemplateCard template={t} onPreview={setPreviewTemplate} />
+                : <WhatsAppTemplateCard template={t} onPreview={setPreviewTemplate} />}
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Preview modal */}
+      <AnimatePresence>
+        {previewTemplate && (
+          <TemplatePreviewModal
+            template={previewTemplate}
+            onClose={() => setPreviewTemplate(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // ─── Main AdminPage ───────────────────────────────────────────────────────────
 
 // Universidades hidden — reserved for future feature
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-  { key: 'programas', label: 'Programas', icon: BookOpen },
-  { key: 'usuarios',  label: 'Usuarios',  icon: Users },
+  { key: 'programas',  label: 'Programas',  icon: BookOpen },
+  { key: 'usuarios',   label: 'Usuarios',   icon: Users },
+  { key: 'templates',  label: 'Templates',  icon: Mail },
 ]
 
 export default function AdminPage() {
@@ -3116,8 +3502,8 @@ export default function AdminPage() {
           >
             {activeTab === 'universidades' && <UniversidadesTab />}
             {activeTab === 'programas'     && <ProgramasTab />}
-
             {activeTab === 'usuarios'      && <UsuariosTab />}
+            {activeTab === 'templates'     && <TemplatesTab />}
           </motion.div>
         </AnimatePresence>
       </main>

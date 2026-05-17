@@ -1,7 +1,18 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Loader2, Bot, User, BookOpen, FileText } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
+// react-markdown no disponible en registry interno — renderizador inline mínimo
+function ReactMarkdown({ children }: { children: string; components?: unknown }) {
+  const html = (children || '')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code class="px-1 py-0.5 rounded text-xs font-mono bg-black/10">$1</code>')
+    .replace(/^### (.+)$/gm, '<h3 class="font-bold mt-2 mb-1">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="font-bold text-base mt-2 mb-1">$1</h2>')
+    .replace(/^- (.+)$/gm, '<li class="ml-4 list-disc leading-snug">$1</li>')
+    .replace(/\n/g, '<br/>')
+  return <p className="leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />
+}
 import { ragService, type RagEvidence } from '../services/ragService'
 
 // Preprocesa el texto plano del RAG para convertirlo a markdown legible
@@ -183,20 +194,7 @@ export default function CourseChat({ courseId, courseName }: Props) {
                   {msg.role === 'user' ? (
                     msg.content
                   ) : (
-                    <ReactMarkdown
-                      components={{
-                        p:      ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
-                        ul:     ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>,
-                        ol:     ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>,
-                        li:     ({ children }) => <li className="leading-snug">{children}</li>,
-                        strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                        em:     ({ children }) => <em className="italic">{children}</em>,
-                        code:   ({ children }) => (
-                          <code className="px-1 py-0.5 rounded text-xs font-mono"
-                                style={{ background: 'rgba(0,0,0,0.08)' }}>{children}</code>
-                        ),
-                      }}
-                    >
+                    <ReactMarkdown>
                       {prepareMarkdown(msg.content)}
                     </ReactMarkdown>
                   )}
