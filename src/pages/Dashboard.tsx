@@ -6,17 +6,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { TrendingUp, Users, BookOpen, ArrowLeft, Layers, ArrowRight, Upload } from 'lucide-react'
-import type { Step } from 'react-joyride'
-import type { Course, Grade } from '../types'
-import { students } from '../data/mockData'
-import { useGradeCalculation } from '../hooks/useGradeCalculation'
+import { BookOpen, RefreshCw } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import Header from '../components/Header'
 import SubjectCard from '../components/SubjectCard'
-import TourGuide from '../components/TourGuide'
 import { useTour } from '../hooks/useTour'
 import DocumentUploadModal from '../components/DocumentUploadModal'
+import { courseService, type BackendCourse } from '../services/courseService'
+import { enrollmentService, type BackendEnrollment } from '../services/enrollmentService'
 
 // ── risk helpers ──────────────────────────────────────────────────────────────
 
@@ -72,45 +69,28 @@ function CourseCard({ course, index, onClick }: CourseCardProps) {
   ).length
   const pct = total > 0 ? Math.round((withData / total) * 100) : 0
 
-function CourseRow({ course, grades, onClick, onUpload, index }: {
-  course: Course; grades: Grade[]; onClick: () => void; onUpload: () => void; index: number
-}) {
-  const { atRiskCount, completionPct } = useGradeCalculation(course, grades, students)
   return (
-    <div className="flex flex-col gap-1.5">
-      <SubjectCard
-        course={course}
-        studentCount={course.studentIds.length}
-        completionPct={completionPct}
-        atRiskCount={atRiskCount}
-        onClick={onClick}
-        index={index}
-      />
-      <button
-        onClick={onUpload}
-        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-colors"
-        style={{
-          background: 'rgba(0,117,74,0.07)',
-          color: 'var(--green-accent)',
-          border: '1px solid rgba(0,117,74,0.15)',
-        }}
-        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,117,74,0.14)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,117,74,0.07)')}
-      >
-        <Upload size={12} />
-        Subir guía de materia
-      </button>
-    </div>
+    <SubjectCard
+      course={course}
+      studentCount={total}
+      completionPct={pct}
+      atRiskCount={atRisk}
+      onClick={onClick}
+      index={index}
+    />
   )
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function Dashboard({ courses, grades, onSelectCourse }: Props) {
+export default function Dashboard() {
   const { user }            = useAuth()
+  const navigate            = useNavigate()
   const { run, onTourEnd }  = useTour('professor-dashboard', user?.id)
-  const totalStudents       = new Set(courses.flatMap(c => c.studentIds)).size
-  const [uploadCourse, setUploadCourse] = useState<Course | null>(null)
+  const [courses, setCourses] = useState<BackendCourse[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
+  const [uploadCourse, setUploadCourse] = useState<BackendCourse | null>(null)
 
   const isEmail     = user?.name.includes('@')
   const displayName = isEmail ? user?.name.split('@')[0] : user?.name.split(' ')[0]
@@ -225,9 +205,6 @@ export default function Dashboard({ courses, grades, onSelectCourse }: Props) {
                 <CourseCard
                   key={course.id}
                   course={course}
-                  grades={grades}
-                  onClick={() => onSelectCourse(course)}
-                  onUpload={() => setUploadCourse(course)}
                   index={i}
                   onClick={() => navigate(`/grades/${course.id}`)}
                 />

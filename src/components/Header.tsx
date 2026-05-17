@@ -2,18 +2,22 @@
  * Header — Starbucks-inspired deep green top bar.
  * Features: brand mark, role-based nav, autosave indicator, user menu, CommandBar trigger.
  */
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LogOut, Cloud, Loader2,
   LayoutDashboard, GraduationCap, Settings, Command,
-  ChevronDown, HelpCircle,
-  type LucideIcon,
+  ChevronDown, HelpCircle, Download, Bell, BellOff,
+  User, CheckCheck, Trash2, AlertTriangle, CalendarCheck,
+  BookOpen, Megaphone, type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import CommandBar, { useCommandBar } from './CommandBar'
 import Tooltip from './Tooltip'
+import { usePWAInstall } from '../hooks/usePWAInstall'
+import { usePushNotifications } from '../hooks/usePushNotifications'
+import { inAppService, type InAppNotification } from '../services/notificationService'
 
 interface Props {
   lastSaved?: Date | null
@@ -46,6 +50,216 @@ function NavLink({
       <Icon size={14} />
       {label}
     </Link>
+  )
+}
+
+// ─── Notification icon map ────────────────────────────────────────────────────
+
+function notifIcon(type: string) {
+  switch (type) {
+    case 'RISK_ALTO':     return <AlertTriangle size={14} className="text-red-500" />
+    case 'RISK_RECOVERED': return <CalendarCheck size={14} className="text-emerald-500" />
+    case 'ATTENDANCE':    return <CalendarCheck size={14} className="text-emerald-500" />
+    case 'GRADE_UPDATE':  return <BookOpen size={14} className="text-blue-500" />
+    case 'CLASS_CRISIS':  return <AlertTriangle size={14} className="text-amber-500" />
+    default:              return <Megaphone size={14} className="text-usb-muted" />
+  }
+}
+
+function fmtNotifTime(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const diffM = Math.floor((now.getTime() - d.getTime()) / 60000)
+  if (diffM < 1)  return 'Ahora'
+  if (diffM < 60) return `Hace ${diffM} min`
+  const diffH = Math.floor(diffM / 60)
+  if (diffH < 24) return `Hace ${diffH} h`
+  return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', timeZone: 'America/Bogota' })
+}
+
+// ─── Notification Bell ────────────────────────────────────────────────────────
+
+function NotificationBell() {
+  const { user }    = useAuth()
+  const isStudent   = user?.role === 'student'
+  const { supported: pushSupported, subscribed, loading: pushLoading, subscribe, unsubscribe } = usePushNotifications()
+
+  const [open, setOpen]           = useState(false)
+  const [notifications, setNotifications] = useState<InAppNotification[]>([])
+  const [unread, setUnread]       = useState(0)
+  const [loading, setLoading]     = useState(false)
+  const pollRef                   = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const load = async () => {
+    const data = await inAppService.getUnread()
+    setNotifications(data)
+    setUnread(data.filter(n => !n.read).length)
+  }
+
+  useEffect(() => {
+    void load()
+    pollRef.current = setInterval(load, 30_000)
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+  }, [])
+
+  const handleOpen = async () => {
+    setOpen(v => !v)
+    if (!open) {
+      setLoading(true)
+      const all = await inAppService.getAll(20)
+      setNotifications(all)
+      setUnread(all.filter(n => !n.read).length)
+      setLoading(false)
+    }
+  }
+
+  const handleMarkRead = async (id: string) => {
+    await inAppService.markRead(id)
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    setUnread(prev => Math.max(0, prev - 1))
+  }
+
+  const handleMarkAll = async () => {
+    await inAppService.markAllRead()
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    setUnread(0)
+  }
+
+  const handleDelete = async (id: string) => {
+    await inAppService.deleteOne(id)
+    const removed = notifications.find(n => n.id === id)
+    setNotifications(prev => prev.filter(n => n.id !== id))
+    if (removed && !removed.read) setUnread(prev => Math.max(0, prev - 1))
+  }
+
+  return (
+    <div className="relative">
+      <Tooltip content="Notificaciones" placement="bottom">
+        <button
+          onClick={handleOpen}
+          className="relative p-2 rounded-xl transition-colors no-tap"
+          style={{ color: open ? 'var(--green-light)' : 'rgba(255,255,255,0.45)', background: open ? 'rgba(212,233,226,0.12)' : 'transparent' }}
+          onMouseEnter={e => { if (!open) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.80)' }}
+          onMouseLeave={e => { if (!open) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)' }}
+        >
+          <Bell size={16} />
+          {unread > 0 && (
+            <span
+              className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full flex items-center justify-center text-[0.58rem] font-extrabold text-white px-1"
+              style={{ background: '#ef4444' }}
+            >
+              {unread > 9 ? '9+' : unread}
+            </span>
+          )}
+        </button>
+      </Tooltip>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-[40]" onClick={() => setOpen(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: -6 }}
+              animate={{ opacity: 1, scale: 1,    y: 0 }}
+              exit={{   opacity: 0, scale: 0.94, y: -6 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+              className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl overflow-hidden z-[50]"
+              style={{ boxShadow: 'var(--shadow-modal)', maxHeight: '480px' }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-usb-border"
+                   style={{ background: 'var(--canvas-warm)' }}>
+                <p className="font-bold text-sm text-usb-text">Notificaciones</p>
+                {unread > 0 && (
+                  <button
+                    onClick={handleMarkAll}
+                    className="flex items-center gap-1 text-xs font-semibold hover:underline"
+                    style={{ color: 'var(--green-accent)' }}
+                  >
+                    <CheckCheck size={12} />
+                    Marcar todas leídas
+                  </button>
+                )}
+              </div>
+
+              {/* List */}
+              <div className="overflow-y-auto" style={{ maxHeight: '340px' }}>
+                {loading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 size={20} className="animate-spin text-usb-muted" />
+                  </div>
+                ) : notifications.length === 0 ? (
+                  <div className="flex flex-col items-center py-10 gap-2">
+                    <Bell size={24} className="text-usb-faint" />
+                    <p className="text-sm text-usb-faint">Sin notificaciones</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-usb-border">
+                    {notifications.map(n => (
+                      <div
+                        key={n.id}
+                        className="flex items-start gap-3 px-4 py-3 group transition-colors cursor-pointer"
+                        style={{ background: n.read ? 'white' : 'rgba(0,117,74,0.04)' }}
+                        onClick={() => { if (!n.read) void handleMarkRead(n.id) }}
+                      >
+                        <div className="flex-shrink-0 mt-0.5">{notifIcon(n.type)}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm leading-tight ${n.read ? 'font-medium text-usb-text' : 'font-bold text-usb-text'}`}>
+                            {n.title}
+                          </p>
+                          <p className="text-xs text-usb-muted mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>
+                          <p className="text-[0.62rem] text-usb-faint mt-1">{fmtNotifTime(n.created_at)}</p>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                          {!n.read && (
+                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: 'var(--green-accent)' }} />
+                          )}
+                          <button
+                            onClick={e => { e.stopPropagation(); void handleDelete(n.id) }}
+                            className="p-1 rounded-lg hover:bg-red-50 text-usb-faint hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer: push toggle (solo estudiantes con soporte) */}
+              {isStudent && pushSupported && (
+                <div className="border-t border-usb-border px-4 py-2.5 flex items-center justify-between gap-3"
+                     style={{ background: 'var(--canvas-warm)' }}>
+                  <div className="flex items-center gap-2">
+                    {pushLoading
+                      ? <Loader2 size={13} className="animate-spin text-usb-muted" />
+                      : subscribed
+                        ? <Bell size={13} style={{ color: 'var(--green-accent)' }} />
+                        : <BellOff size={13} className="text-usb-faint" />
+                    }
+                    <span className="text-xs font-semibold text-usb-muted">
+                      {subscribed ? 'Alertas push activas' : 'Alertas push desactivadas'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => void (subscribed ? unsubscribe() : subscribe())}
+                    disabled={pushLoading}
+                    className="relative w-9 h-5 rounded-full transition-colors duration-200 flex-shrink-0 disabled:opacity-50"
+                    style={{ background: subscribed ? 'var(--green-accent)' : '#d1d5db' }}
+                  >
+                    <span
+                      className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
+                      style={{ transform: subscribed ? 'translateX(16px)' : 'translateX(0px)' }}
+                    />
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 
@@ -120,6 +334,15 @@ function UserChip({ onLogout }: { onLogout: () => void }) {
 
               {/* Actions */}
               <div className="py-1.5">
+                <Link
+                  to="/perfil"
+                  onClick={() => setOpen(false)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-usb-text hover:bg-gray-50 transition-colors font-medium"
+                >
+                  <User size={14} className="text-usb-muted" />
+                  Mi Perfil
+                </Link>
+                <div className="mx-3 my-1 h-px bg-usb-border" />
                 <button
                   onClick={() => { setOpen(false); onLogout() }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors font-semibold"
@@ -142,6 +365,7 @@ export default function Header({ lastSaved, subtitle }: Props) {
   const { user, logout } = useAuth()
   const navigate         = useNavigate()
   const { open, setOpen} = useCommandBar()
+  const { canInstall, install } = usePWAInstall()
 
   const isStudent   = user?.role === 'student'
   const isProfessor = user?.role === 'professor'
@@ -241,6 +465,20 @@ export default function Header({ lastSaved, subtitle }: Props) {
               </div>
             )}
 
+            {/* Instalar PWA */}
+            {canInstall && (
+              <Tooltip content="Instalar Academic Risk en tu celular" placement="bottom">
+                <button
+                  onClick={() => void install()}
+                  aria-label="Instalar app"
+                  className="hidden sm:flex items-center gap-1.5 text-white/60 text-xs px-2.5 py-1.5 rounded-xl hover:bg-white/10 hover:text-white transition-colors border border-white/15 no-tap"
+                >
+                  <Download size={12} />
+                  <span className="font-semibold">Instalar</span>
+                </button>
+              </Tooltip>
+            )}
+
             {/* Cmd+K trigger */}
             <Tooltip content="Búsqueda rápida (⌘K)" placement="bottom">
               <button
@@ -263,6 +501,9 @@ export default function Header({ lastSaved, subtitle }: Props) {
                 <HelpCircle size={15} />
               </button>
             </Tooltip>
+
+            {/* In-app notification bell */}
+            <NotificationBell />
 
             {/* Divider */}
             <div className="w-px h-5 bg-white/10" />

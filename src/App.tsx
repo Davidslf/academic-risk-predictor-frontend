@@ -11,8 +11,13 @@ import GradesPage from './pages/Grades'
 import ReferralsPage from './pages/Referrals'
 import AdminPage from './pages/Admin'
 import EstadisticasProfesor from './pages/EstadisticasProfesor'
+import Simulador from './pages/Simulador'
+import AsistenciaProfesor from './pages/AsistenciaProfesor'
+import AsistenciaEstudiante from './pages/AsistenciaEstudiante'
+import PerfilPage from './pages/Perfil'
 import ConsentModal from './components/ConsentModal'
 import { consentService } from './services/consentService'
+import { useGrades } from './context/GradesContext'
 
 // ─── Error Boundary ──────────────────────────────────────────────────────────
 interface EBState { hasError: boolean; message: string }
@@ -199,7 +204,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <StudentConsentGate />
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="sync" initial={false}>
         <motion.div
           key={location.pathname}
           initial={{ opacity: 0, y: 10 }}
@@ -231,20 +236,30 @@ export default function App() {
             <Route path="/materia/:courseId" element={
               <RequireRole role="student"><MateriaDetalle /></RequireRole>
             } />
+            <Route path="/materia/:courseId/simulador" element={
+              <RequireRole role="student"><Simulador /></RequireRole>
+            } />
 
             {/* Professor */}
             <Route path="/dashboard" element={
               <RequireRole role="professor"><Dashboard /></RequireRole>
             } />
             <Route path="/grades/:courseId" element={
-              <RequireRole role="professor"><GradesPage /></RequireRole>
+              <RequireRole role="professor"><ProfessorGrades /></RequireRole>
             } />
             <Route path="/referrals/:courseId" element={
               <RequireRole role="professor"><ReferralsPage /></RequireRole>
             } />
             {/* Legacy redirects */}
             <Route path="/grades"       element={<Navigate to="/dashboard" replace />} />
+            {/* Asistencias con QR */}
+            <Route path="/materia/:courseId/asistencia" element={
+              <RequireRole role="professor"><AsistenciaProfesor /></RequireRole>
+            } />
+            <Route path="/asistencia/:sessionId/:token" element={<AsistenciaEstudiante />} />
+            <Route path="/asistencia" element={<AsistenciaEstudiante />} />
             <Route path="/estadisticas" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/perfil" element={<PerfilPage />} />
 
             {/* Catch-all */}
             <Route path="*" element={<RoleHome />} />

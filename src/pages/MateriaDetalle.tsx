@@ -4,13 +4,15 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, BookOpen, Hash, Calendar, Loader2, AlertCircle,
-  GraduationCap, BarChart2, User, Award, ChevronDown,
+  GraduationCap, BarChart2, User, Award, ChevronDown, Sliders, QrCode,
+  Target, CheckCircle2, XCircle, CalendarCheck, Clock,
 } from 'lucide-react'
 import Header from '../components/Header'
+import RiskoAnalysis from '../components/RiskoAnalysis'
 import CourseChat from '../components/CourseChat'
 import { courseService, type BackendCourse } from '../services/courseService'
 import { predictionService } from '../services/predictionService'
@@ -20,6 +22,7 @@ import {
   type CohortRiskRead,
   type EnrollmentRiskRead,
 } from '../services/enrollmentService'
+import { attendanceService, type AttendanceHistoryItem } from '../services/attendanceService'
 import { useAuth } from '../context/AuthContext'
 
 // ─── Main page ───────────────────────────────────────────────────────────────
@@ -151,6 +154,179 @@ function normalizeRiskError(raw: string, scope: 'total' | 'cohort', cohort?: Coh
   return msg
 }
 
+// ─── "¿Cuánto necesito sacar?" Calculator ────────────────────────────────────
+
+interface NeededResult {
+  label:    string
+  needed:   number
+  possible: boolean
+  done:     boolean
+  grade:    number | null
+}
+
+function calcNeeded(
+  c1: number | null,
+  c2: number | null,
+  c3: number | null,
+  target: number,
+): NeededResult[] {
+  const w = 1 / 3
+  const grades   = [c1, c2, c3]
+  const labels   = ['Corte 1', 'Corte 2', 'Corte 3']
+  const earnedSum = grades.reduce<number>((s, g) => s + (g !== null ? g * w : 0), 0)
+  const pendingIdx = grades.map((g, i) => ({ i, g })).filter(x => x.g === null)
+
+  if (pendingIdx.length === 0) {
+    return grades.map((g, i) => ({ label: labels[i], needed: 0, possible: true, done: true, grade: g }))
+  }
+
+  const remainWeight  = pendingIdx.length * w
+  const neededAvg     = (target - earnedSum) / remainWeight
+
+  return grades.map((g, i) => ({
+    label:    labels[i],
+    needed:   g !== null ? 0 : neededAvg,
+    possible: g !== null ? true : neededAvg <= 5.0,
+    done:     g !== null,
+    grade:    g,
+  }))
+}
+
+function GradoNecesario({
+  c1, c2, c3,
+}: { c1: number | null; c2: number | null; c3: number | null }) {
+  const [target, setTarget] = useState(3.0)
+  const results = calcNeeded(c1, c2, c3, target)
+  const pending = results.filter(r => !r.done)
+  const alreadyPassing = pending.length > 0 && pending.every(r => r.needed <= 0)
+  const impossible     = pending.length > 0 && pending.some(r => !r.possible)
+  const allDone        = pending.length === 0
+  const currentEstimate = allDone
+    ? (c1 !== null && c2 !== null && c3 !== null ? (c1 + c2 + c3) / 3 : null)
+    : null
+
+  const statusColor = allDone
+    ? (currentEstimate !== null && currentEstimate >= target ? '#16a34a' : '#dc2626')
+    : impossible
+      ? '#dc2626'
+      : alreadyPassing
+        ? '#16a34a'
+        : '#d97706'
+
+  return (
+    <div className="rounded-xl p-4 space-y-3"
+         style={{ background: 'linear-gradient(135deg,rgba(0,117,74,0.04) 0%,rgba(0,117,74,0.02) 100%)',
+                  border: '1.5px solid rgba(0,117,74,0.12)' }}>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+               style={{ background: 'rgba(0,117,74,0.10)', color: 'var(--green-accent)' }}>
+            <Target size={14} />
+          </div>
+          <p className="font-bold text-sm" style={{ color: 'var(--text-dark)' }}>
+            ¿Cuánto necesito sacar?
+          </p>
+        </div>
+        {/* Target grade slider */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold" style={{ color: 'var(--text-faint)' }}>Meta:</span>
+          <input
+            type="range" min={1.0} max={5.0} step={0.1}
+            value={target}
+            onChange={e => setTarget(Number(e.target.value))}
+            className="w-24 accent-green-600"
+          />
+          <span
+            className="text-sm font-extrabold w-8 text-right"
+            style={{ color: statusColor }}
+          >
+            {target.toFixed(1)}
+          </span>
+        </div>
+      </div>
+
+      {/* Status banner */}
+      {allDone && currentEstimate !== null && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
+             style={{ background: currentEstimate >= target ? '#dcfce7' : '#fee2e2' }}>
+          {currentEstimate >= target
+            ? <CheckCircle2 size={14} className="text-green-600 flex-shrink-0" />
+            : <XCircle size={14} className="text-red-600 flex-shrink-0" />}
+          <p className="text-xs font-semibold"
+             style={{ color: currentEstimate >= target ? '#15803d' : '#b91c1c' }}>
+            {currentEstimate >= target
+              ? `¡Pasas la materia con ${currentEstimate.toFixed(2)}! 🎉`
+              : `Nota final estimada: ${currentEstimate.toFixed(2)} — por debajo de ${target.toFixed(1)}`}
+          </p>
+        </div>
+      )}
+
+      {!allDone && alreadyPassing && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: '#dcfce7' }}>
+          <CheckCircle2 size={14} className="text-green-600 flex-shrink-0" />
+          <p className="text-xs font-semibold text-green-700">
+            ¡Ya tienes notas suficientes para pasar con {target.toFixed(1)}! Solo asegura asistir. 🎉
+          </p>
+        </div>
+      )}
+
+      {!allDone && impossible && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: '#fee2e2' }}>
+          <XCircle size={14} className="text-red-600 flex-shrink-0" />
+          <p className="text-xs font-semibold text-red-700">
+            Matemáticamente no es posible alcanzar {target.toFixed(1)} con los cortes restantes. Habla con tu docente.
+          </p>
+        </div>
+      )}
+
+      {/* Corte breakdown */}
+      <div className="grid grid-cols-3 gap-2">
+        {results.map(r => (
+          <div key={r.label}
+               className="rounded-lg p-2.5 text-center"
+               style={{
+                 background: r.done ? 'rgba(22,163,74,0.06)' : 'white',
+                 border: `1px solid ${r.done ? 'rgba(22,163,74,0.18)' : 'rgba(0,0,0,0.08)'}`,
+               }}>
+            <p className="text-[0.58rem] font-extrabold uppercase tracking-wider mb-1"
+               style={{ color: 'var(--text-faint)' }}>{r.label}</p>
+            {r.done ? (
+              <>
+                <p className="text-base font-extrabold" style={{ color: gradeColor(r.grade) }}>
+                  {r.grade !== null ? r.grade.toFixed(1) : '—'}
+                </p>
+                <p className="text-[0.58rem] text-green-600 font-bold mt-0.5 flex items-center justify-center gap-0.5">
+                  <CheckCircle2 size={9} /> Listo
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-base font-extrabold"
+                   style={{ color: !r.possible ? '#dc2626' : r.needed <= 2.5 ? '#16a34a' : r.needed <= 3.8 ? '#d97706' : '#dc2626' }}>
+                  {!r.possible ? '> 5.0' : r.needed <= 0 ? '0.0' : r.needed.toFixed(1)}
+                </p>
+                <p className="text-[0.58rem] font-semibold mt-0.5"
+                   style={{ color: 'var(--text-faint)' }}>mínimo</p>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Footer note */}
+      <p className="text-[0.60rem]" style={{ color: 'var(--text-faint)' }}>
+        <span className="font-bold">*</span> Calculado con peso igual (33.3%) por corte.
+        {pending.length > 0 && !alreadyPassing && !impossible && (
+          <span> Necesitas sacar <strong style={{ color: statusColor }}>
+            {results.find(r => !r.done)?.needed.toFixed(1) ?? '—'}
+          </strong> ó más en cada corte pendiente.</span>
+        )}
+      </p>
+    </div>
+  )
+}
+
 export default function MateriaDetalle() {
   const { courseId } = useParams<{ courseId: string }>()
   const navigate     = useNavigate()
@@ -162,6 +338,11 @@ export default function MateriaDetalle() {
 
   const [gradesData, setGradesData]       = useState<BackendGradesRead | null>(null)
   const [loadingGrades, setLoadingGrades] = useState(false)
+  const [attendanceHistory, setAttendanceHistory] = useState<AttendanceHistoryItem[]>([])
+  const [loadingAttHist, setLoadingAttHist] = useState(false)
+  const [mainTab, setMainTab] = useState<'calificaciones' | 'asistencia'>('calificaciones')
+  const [attPage, setAttPage] = useState(0)
+  const ATT_PAGE_SIZE = 10
   const [selectedCohort, setSelectedCohort] = useState<'first_cohort' | 'second_cohort' | 'third_cohort' | null>(null)
   const [enrollmentId, setEnrollmentId] = useState<string | null>(null)
   const [totalRiskLoading, setTotalRiskLoading] = useState(false)
@@ -260,6 +441,14 @@ export default function MateriaDetalle() {
 
   useEffect(() => { void loadCourse() }, [loadCourse])
   useEffect(() => { void loadGrades() }, [loadGrades])
+  useEffect(() => {
+    if (!courseId) return
+    setLoadingAttHist(true)
+    void attendanceService.getMyHistoryByCourse(courseId).then(data => {
+      setAttendanceHistory(data)
+      setLoadingAttHist(false)
+    })
+  }, [courseId])
 
   return (
     <div className="min-h-screen bg-usb-canvas flex flex-col">
@@ -386,6 +575,20 @@ export default function MateriaDetalle() {
                     </span>
                   </div>
                 </div>
+
+                {/* Botón registrar asistencia QR */}
+                <button
+                  onClick={() => navigate(`/asistencia`)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all"
+                  style={{
+                    background: 'var(--green-accent)',
+                    color: 'white',
+                    boxShadow: '0 2px 8px rgba(0,117,74,0.20)',
+                  }}
+                >
+                  <QrCode size={15} />
+                  Registrar asistencia
+                </button>
               </div>
             </motion.aside>
 
@@ -399,7 +602,145 @@ export default function MateriaDetalle() {
                 <CourseChat courseId={courseId ?? ''} courseName={course.name} />
               </motion.div>
 
-              {/* Calificaciones */}
+              {/* Tab switcher */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.13 }}
+                className="flex gap-1 bg-white border rounded-2xl p-1 w-fit"
+                style={{ boxShadow: 'var(--shadow-card)', borderColor: 'rgba(0,0,0,0.07)' }}
+              >
+                {([
+                  { key: 'calificaciones', label: 'Calificaciones',  icon: <Award size={13} /> },
+                  { key: 'asistencia',     label: 'Mi asistencia',   icon: <CalendarCheck size={13} />,
+                    badge: attendanceHistory.length || undefined },
+                ] as const).map(t => (
+                  <button
+                    key={t.key}
+                    onClick={() => setMainTab(t.key)}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                    style={mainTab === t.key
+                      ? { background: 'var(--green-accent)', color: 'white' }
+                      : { color: 'var(--text-muted)' }}
+                  >
+                    {t.icon}
+                    {t.label}
+                    {'badge' in t && t.badge ? (
+                      <span className="text-[0.60rem] font-extrabold px-1.5 py-0.5 rounded-full"
+                            style={mainTab === t.key
+                              ? { background: 'rgba(255,255,255,0.25)', color: 'white' }
+                              : { background: 'rgba(0,117,74,0.10)', color: 'var(--green-accent)' }}>
+                        {t.badge}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </motion.div>
+
+              {/* ── Pestaña: Asistencia ── */}
+              {mainTab === 'asistencia' && (() => {
+                const totalPages = Math.ceil(attendanceHistory.length / ATT_PAGE_SIZE)
+                const pageItems  = attendanceHistory.slice(attPage * ATT_PAGE_SIZE, (attPage + 1) * ATT_PAGE_SIZE)
+                return (
+                  <motion.div
+                    key="asistencia-tab"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white rounded-2xl p-4"
+                    style={{ boxShadow: 'var(--shadow-card)', border: '1px solid rgba(0,0,0,0.07)' }}
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-2">
+                        <CalendarCheck size={16} style={{ color: 'var(--green-accent)' }} />
+                        <h2 className="font-bold text-sm" style={{ color: 'var(--text-dark)' }}>
+                          Historial de asistencia
+                        </h2>
+                      </div>
+                      {attendanceHistory.length > 0 && (
+                        <span className="text-[0.65rem] font-bold px-2.5 py-0.5 rounded-full"
+                              style={{ background: 'rgba(0,117,74,0.10)', color: 'var(--green-accent)' }}>
+                          {attendanceHistory.length} {attendanceHistory.length === 1 ? 'clase' : 'clases'}
+                        </span>
+                      )}
+                    </div>
+
+                    {loadingAttHist ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 size={20} className="animate-spin" style={{ color: 'var(--green-accent)' }} />
+                      </div>
+                    ) : attendanceHistory.length === 0 ? (
+                      <div className="flex flex-col items-center py-10 gap-2 rounded-xl"
+                           style={{ background: 'var(--canvas-warm)', border: '1.5px dashed rgba(0,0,0,0.08)' }}>
+                        <CalendarCheck size={26} style={{ color: 'var(--text-faint)' }} />
+                        <p className="text-sm font-semibold" style={{ color: 'var(--text-subtle)' }}>Sin asistencias registradas</p>
+                        <p className="text-xs text-center max-w-xs" style={{ color: 'var(--text-faint)' }}>
+                          Escanea el QR del profesor para registrar tu asistencia
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-1.5">
+                          {pageItems.map((item, idx) => (
+                            <div key={`${item.session_id}-${idx}`}
+                                 className="flex items-center gap-3 rounded-xl px-3 py-2.5"
+                                 style={{ background: 'var(--canvas-warm)', border: '1px solid rgba(0,0,0,0.06)' }}>
+                              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                                   style={{ background: 'rgba(22,163,74,0.10)' }}>
+                                <CheckCircle2 size={14} className="text-emerald-600" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm leading-tight truncate" style={{ color: 'var(--text-dark)' }}>
+                                  {item.session_label ?? 'Clase sin nombre'}
+                                </p>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <Clock size={10} style={{ color: 'var(--text-faint)' }} />
+                                  <p className="text-xs" style={{ color: 'var(--text-faint)' }}>
+                                    {item.recorded_at_colombia}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-[0.62rem] font-bold px-2 py-0.5 rounded-full text-emerald-700 flex-shrink-0"
+                                    style={{ background: '#dcfce7' }}>✓ Asistió</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Paginación */}
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-between mt-3 pt-3"
+                               style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                            <button
+                              onClick={() => setAttPage(p => Math.max(0, p - 1))}
+                              disabled={attPage === 0}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
+                              style={{ border: '1px solid rgba(0,0,0,0.10)', color: 'var(--text-muted)' }}
+                            >
+                              <ChevronDown size={12} style={{ transform: 'rotate(90deg)' }} />
+                              Anterior
+                            </button>
+                            <span className="text-xs font-semibold" style={{ color: 'var(--text-faint)' }}>
+                              {attPage + 1} / {totalPages}
+                            </span>
+                            <button
+                              onClick={() => setAttPage(p => Math.min(totalPages - 1, p + 1))}
+                              disabled={attPage >= totalPages - 1}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all disabled:opacity-40"
+                              style={{ border: '1px solid rgba(0,0,0,0.10)', color: 'var(--text-muted)' }}
+                            >
+                              Siguiente
+                              <ChevronDown size={12} style={{ transform: 'rotate(-90deg)' }} />
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </motion.div>
+                )
+              })()}
+
+              {/* ── Pestaña: Calificaciones ── */}
+              {mainTab === 'calificaciones' && (
+              <>{/* Calificaciones */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -413,6 +754,15 @@ export default function MateriaDetalle() {
                   <h2 className="font-bold" style={{ color: 'var(--text-dark)' }}>Calificaciones</h2>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
+                  {/* Simulador */}
+                  <Link
+                    to={`/materia/${courseId}/simulador`}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl font-bold text-xs flex-shrink-0 transition-all border"
+                    style={{ background: 'white', color: 'var(--green-accent)', borderColor: 'var(--green-accent)' }}
+                  >
+                    <Sliders size={12} />
+                    Simulador
+                  </Link>
                   <button
                     onClick={() => { void calculateTotalRisk() }}
                     disabled={totalRiskLoading || !gradesData?.grades || !enrollmentId}
@@ -618,6 +968,13 @@ export default function MateriaDetalle() {
                     </p>
                   </div>
 
+                  {/* ¿Cuánto necesito sacar? */}
+                  <GradoNecesario
+                    c1={gradesData.first_cohort_grade  !== undefined ? gradesData.first_cohort_grade  : null}
+                    c2={gradesData.second_cohort_grade !== undefined ? gradesData.second_cohort_grade : null}
+                    c3={gradesData.third_cohort_grade  !== undefined ? gradesData.third_cohort_grade  : null}
+                  />
+
                   {(totalRiskError || cohortRiskError || totalRisk || (selectedCohort ? cohortRisks[selectedCohort] : null)) && (
                     <div
                       className="rounded-xl p-3 space-y-2"
@@ -671,6 +1028,13 @@ export default function MateriaDetalle() {
                           )}
                         </div>
 
+                        {totalRisk?.analisis_ia && (
+                          <RiskoAnalysis
+                            analisis={totalRisk.analisis_ia}
+                            nivel={totalRisk.nivel_riesgo}
+                          />
+                        )}
+
                         <div className="rounded-lg p-2.5" style={{ background: 'var(--canvas-warm)', border: '1px solid rgba(0,0,0,0.06)' }}>
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-faint)' }}>
@@ -719,6 +1083,8 @@ export default function MateriaDetalle() {
                 </div>
               )}
             </motion.div>
+            </>
+            )}
             </div>
           </div>
         )}

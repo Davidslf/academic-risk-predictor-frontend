@@ -41,7 +41,7 @@ export default function SubjectCard({ course, studentCount, completionPct, atRis
           </div>
           <div className="flex items-center gap-1.5 text-usb-muted text-xs">
             <BookOpen size={13} />
-            <span>{course.components.length} componentes</span>
+            <span>{course.components?.length ?? 0} componentes</span>
           </div>
           {atRiskCount > 0 && (
             <div className="flex items-center gap-1 text-xs font-medium text-risk-high ml-auto">
