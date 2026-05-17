@@ -1,0 +1,48 @@
+src/App.tsx
+  s_b03b3a99345ebc::t_9ee8c9bfbf3f28 41,43
+src/pages/Admin.tsx
+  s_b03b3a99345ebc::t_39439b77a478ad 771
+  s_b03b3a99345ebc::t_70e18c6d3a1827 2271
+  s_b03b3a99345ebc::t_4d49a0bc9107ed 2220
+  s_b03b3a99345ebc::t_8689900bd4fbef 404,427,512,535,1085,1161,2614
+  s_b03b3a99345ebc::t_cfe9b343c19528 298
+  s_b03b3a99345ebc::t_88afd6fb84d702 333
+  s_b03b3a99345ebc::t_66ca00ec6d22ed 844
+src/components/Toast.tsx
+  s_b03b3a99345ebc::t_9d271d91467576 105
+  s_b03b3a99345ebc::t_31471411c712ad 167
+src/components/Header.tsx
+  s_b03b3a99345ebc::t_9418770fa92c6a 230-231,234-267
+  s_b03b3a99345ebc::t_398ee30ca57bcc 166
+  s_b03b3a99345ebc::t_eaf6dac0829fc4 85
+src/pages/Grades.tsx
+  s_b03b3a99345ebc::t_530093e16977d2 872-878
+  s_b03b3a99345ebc::t_6039ee4d3d3f4b 137
+  s_b03b3a99345ebc::t_ea0f26e4070136 307,309-313,315
+  s_b03b3a99345ebc::t_6ed95d7bca5378 854,856-859
+src/pages/MateriaDetalle.tsx
+  s_b03b3a99345ebc::t_98eb307ce57926 610
+  s_b03b3a99345ebc::t_55bd887d95cd9a 297
+  s_b03b3a99345ebc::t_07ceb8d948b72c 472-474,476,482,487,490
+src/components/RiskoAnalysis.tsx
+  s_b03b3a99345ebc::t_a801e0590597c5 9-31
+  s_b03b3a99345ebc::t_b0199d07ea0831 104
+  s_b03b3a99345ebc::t_48807c7f0f0ec2 137
+  s_b03b3a99345ebc::t_b260e5d6945762 125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "c548f9403c14031a804e17b8f642516093742df2",
+  "prompts": {},
+  "sessions": {
+    "s_b03b3a99345ebc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "379dbf03-6b10-4ee4-83b4-56a99a81b41a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "daforonda_meli <davidlujan.foronda@mercadolibre.com.co>"
+    }
+  }
+}
